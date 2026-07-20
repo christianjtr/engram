@@ -1,0 +1,32 @@
+# =========================================================================
+# Engram Semantic Graph Plugin - Git Ignore Configuration
+# =========================================================================
+
+# 1. Dependency Directories
+node_modules/
+jspm_packages/
+web_modules/
+
+# 2. Production Build Output (Generated dynamically by esbuild)
+dist/
+build/
+
+# 3. Local Runtime Configurations & Graphs
+# We must never commit the user's private tokens, configs, or local maps
+graph-config.json
+knowledge_graph.json
+
+# 4. Log Files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# 5. OS Metadata & IDE Caches
+.DS_Store
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
