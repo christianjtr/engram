@@ -12,30 +12,27 @@ export const C = {
 export const W = {
     banner: {
         line: `${C.blue}${C.bright}====================================================${C.reset}`,
-        title: `${C.cyan}${C.bright}      🧠 ENGRAM SEMANTIC GRAPH CONFIG WIZARD       ${C.reset}`
-    },
-    trigger: {
-        title: `\n${C.yellow}${C.bright}▶ 1. Trigger Generation Mode${C.reset}`,
-        description: `   Defines how and when your semantic relational map refreshes.\n` +
-            `   ${C.bright}1) On Demand${C.reset}  ➔ Managed dynamically by AI Agents via MCP ${C.dim}(Recommended)${C.reset}\n` +
-            `   ${C.bright}2) Scheduled${C.reset} ➔ Periodic background execution interval\n`,
-        query: `${C.cyan}➔ Select option [1/2] (Default: 1): ${C.reset}`,
-        intervalQuery: (current: number) => `${C.cyan}➔ Enter background interval in minutes (Default: ${current}): ${C.reset}`,
-        success: (mode: string, min: number) => `   ${C.green}✓ Trigger set to: "${mode}" (${min} min)${C.reset}\n`,
-        errorSelection: `${C.red}❌ Invalid selection. Please type 1 or 2.${C.reset}`,
-        errorInterval: `${C.red}❌ Please enter a valid positive integer greater than 0.${C.reset}`
+        title: `${C.cyan}${C.bright}      🧠 ENGRAM SEMANTIC GRAPH INITIALIZATION       ${C.reset}`
     },
     strategy: {
-        title: `${C.yellow}${C.bright}▶ 2. Timeline Session Isolation${C.reset}`,
-        description: `   Isolates metadata connections strictly inside active developer Session IDs.\n` +
-            `   Prevents historical test failure logs from leaking into current prompt scopes.\n`,
-        query: (current: boolean) => `${C.cyan}➔ Enforce strict session isolation? [y/n] (Default: ${current ? 'y' : 'n'}): ${C.reset}`,
-        success: (status: boolean) => `   ${C.green}✓ Session isolation status set to: ${status}${C.reset}\n`,
-        error: `${C.red}❌ Invalid input. Please enter 'y' (yes) or 'n' (no).${C.reset}`
+        title: `\n${C.yellow}${C.bright}▶ 🛠️  Smart Memory Isolation (Session-Based)${C.reset}`,
+        description:
+            `   This feature creates an invisible boundary between your coding sessions.\n\n` +
+            `   ${C.green}• WITH ISOLATION (Recommended):${C.reset}\n` +
+            `     The AI stays 100% focused on your current task. It will prioritize\n` +
+            `     the decisions, files, and notes from your active session, preventing\n` +
+            `     older, unrelated project history from cluttering the workspace memory.\n\n` +
+            `   ${C.red}• WITHOUT ISOLATION:${C.reset}\n` +
+            `     The AI mixes all historical project memories together. It might get\n` +
+            `     distracted by legacy choices or past conventions you already moved away from,\n` +
+            `     reducing the accuracy of its suggestions.\n`,
+        query: (current: boolean) => `${C.cyan}➔ Enable session isolation? [y/n] (Default: ${current ? 'y' : 'n'}): ${C.reset}`,
+        success: (status: boolean) => `   ${C.green}✓ Session isolation is now: ${status ? "ENABLED 🛡️" : "DISABLED ⚠️"}${C.reset}\n`,
+        error: `${C.red}❌ Please enter 'y' for Yes or 'n' for No.${C.reset}`
     },
     footer: {
-        successHeading: `${C.green}${C.bright}🎉 SUCCESS: Plugin environmental config initialized!${C.reset}`,
-        storageLabel: `   Stored securely at: `,
-        errorHeading: `${C.red}❌ Critical Exception while dumping config payload:${C.reset}`
+        successHeading: `${C.green}${C.bright}🎉 SUCCESS: Your AI map settings are ready!${C.reset}`,
+        storageLabel: `   Saved in your local system at: `,
+        errorHeading: `${C.red}❌ Error writing settings file:${C.reset}`
     }
 };

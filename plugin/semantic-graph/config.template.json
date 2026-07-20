@@ -1,8 +1,4 @@
 {
-    "trigger": {
-        "mode": "on_demand",
-        "interval_minutes": 10
-    },
     "generation_strategy": {
         "link_by_session": true,
         "link_by_project": true,
