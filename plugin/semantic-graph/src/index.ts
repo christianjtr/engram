@@ -3,6 +3,10 @@ import { SEMANTIC_GRAPH_PATH } from "./config";
 import { buildKnowledgeGraph, saveKnowledgeGraph } from "./core/builder";
 import { runCliMenu } from "./cli/runner";
 
+/**
+ * Main entry point for the semantic-graph plugin.
+ * Supports both direct execution and interactive CLI mode.
+ */
 export async function main(): Promise<void> {
     const args = process.argv.slice(2);
 
