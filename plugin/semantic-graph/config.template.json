@@ -1,7 +1,0 @@
-{
-    "generation_strategy": {
-        "link_by_session": true,
-        "link_by_project": true,
-        "max_depth_levels": 2
-    }
-}

@@ -2,19 +2,20 @@
   "name": "engram-semantic-graph",
   "version": "1.0.0",
   "description": "Deterministic semantic knowledge graph plugin for Engram via MCP",
-  "main": "dist/mcp-server.js",
+  "main": "dist/semantic-graph.js",
   "private": true,
-  "type": "module",
   "files": [
-    "dist/mcp-server.js",
+    "dist",
     "README.md"
   ],
   "scripts": {
     "preinstall": "npx lockfile-lint --path package-lock.json --type npm --allowed-hosts npm --validate-https --validate-integrity",
-    "build": "node esbuild.config.mjs",
+    "clean": "rm -rf dist",
+    "build": "npm run clean && node esbuild.config.mjs",
     "dev": "node esbuild.config.mjs --watch",
-    "init-config": "node dist/cli-init.js",
-    "process-graph": "node dist/processor.js"
+    "start": "node dist/semantic-graph.js",
+    "cli": "node dist/semantic-graph.js --cli",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "engram",
@@ -26,9 +27,12 @@
   "author": "Christian Torrealba <christianjtr>",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.4.0"
+    "@clack/prompts": "^1.7.0",
+    "@modelcontextprotocol/sdk": "^1.4.0",
+    "graphlib": "^2.1.8"
   },
   "devDependencies": {
+    "@types/graphlib": "^2.1.12",
     "@types/node": "^20.0.0",
     "builtin-modules": "^5.3.0",
     "esbuild": "^0.21.0",
