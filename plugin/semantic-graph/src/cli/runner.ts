@@ -46,12 +46,35 @@ export async function runCliMenu(): Promise<void> {
         }
 
         if (action === "generate") {
+            const formatOption = await select({
+                message: "Select output JSON format:",
+                options: [
+                    {
+                        value: true,
+                        label: "Minified (Recommended)",
+                        hint: "Compressed single-line output for optimal performance and smaller size"
+                    },
+                    {
+                        value: false,
+                        label: "Pretty-Printed",
+                        hint: "Formatted with indentation for easy manual inspection and debugging"
+                    }
+                ]
+            });
+
+            if (isCancel(formatOption)) {
+                cancel("Operation cancelled.");
+                process.exit(0);
+            }
+
+            const shouldMinify = formatOption as boolean;
+
             const s = spinner();
             s.start("Generating knowledge graph...");
 
             try {
-                const stats = await runGenerateGraphAction();
-                s.stop("✨ Knowledge graph generated successfully!");
+                const stats = await runGenerateGraphAction({ minify: shouldMinify });
+                s.stop(`✨ Knowledge graph generated successfully! (${shouldMinify ? "minified" : "pretty-printed"})`);
 
                 console.log(`\n📊 Summary:`);
                 console.log(`   - Nodes: ${stats.nodeCount}`);

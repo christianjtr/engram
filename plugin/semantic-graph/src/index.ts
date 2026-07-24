@@ -1,33 +1,23 @@
-import fs from "fs";
-import { SEMANTIC_GRAPH_PATH } from "./config";
-import { buildKnowledgeGraph, saveKnowledgeGraph } from "./core/builder";
 import { runCliMenu } from "./cli/runner";
+import { runGenerateGraphAction } from "./cli/actions";
 
 /**
  * Main entry point for the semantic-graph plugin.
- * Supports both direct execution and interactive CLI mode.
+ * Runs the interactive CLI menu by default, or generates the graph directly via flag.
  */
 export async function main(): Promise<void> {
     const args = process.argv.slice(2);
 
-    if (args.includes("--cli") || args.includes("-c")) {
-        await runCliMenu();
+    // Direct execution flag to bypass CLI menu
+    if (args.includes("--generate") || args.includes("-g")) {
+        console.log("⚡ Generating semantic graph directly...");
+        await runGenerateGraphAction({ minify: true });
+        console.log("✨ Graph generated successfully!");
         return;
     }
 
-    const graphMissing = !fs.existsSync(SEMANTIC_GRAPH_PATH);
-    const forceRebuild = args.includes("--force-rebuild");
-
-    if (graphMissing || forceRebuild) {
-        console.log("Building knowledge graph from Engram memory...");
-        const graph = buildKnowledgeGraph();
-
-        console.log("Saving graph...");
-        saveKnowledgeGraph(graph, SEMANTIC_GRAPH_PATH);
-        console.log(`Graph saved at: ${SEMANTIC_GRAPH_PATH}`);
-    } else {
-        console.log("Using cached graph.");
-    }
+    // Default: Run interactive CLI
+    await runCliMenu();
 
     // Future milestone: Start the sidecar MCP server here
     // await startMcpServer(SEMANTIC_GRAPH_PATH);

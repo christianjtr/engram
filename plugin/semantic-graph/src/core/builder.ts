@@ -171,7 +171,19 @@ export function buildKnowledgeGraph(config?: SemanticGraphConfig): GraphLibJson 
 /**
  * Saves the generated knowledge graph to disk in native Graphlib JSON format.
  */
-export function saveKnowledgeGraph(graphJson: GraphLibJson, outputPath: string = SEMANTIC_GRAPH_PATH): void {
-    fs.writeFileSync(outputPath, JSON.stringify(graphJson, null, 2), "utf-8");
-    console.log(`Knowledge graph saved successfully using Graphlib native schema.`);
+
+export interface SaveGraphOptions {
+    /** Whether to minify the JSON output. Defaults to true. */
+    minify?: boolean;
+}
+
+export function saveKnowledgeGraph(graphJson: GraphLibJson, outputPath: string = SEMANTIC_GRAPH_PATH, options?: SaveGraphOptions): void {
+    const { minify = true } = options || {};
+
+    const jsonContent = minify
+        ? JSON.stringify(graphJson)
+        : JSON.stringify(graphJson, null, 2);
+
+    fs.writeFileSync(outputPath, jsonContent, "utf-8");
+    console.log(`Knowledge graph saved successfully using Graphlib native schema. Size: ${(jsonContent.length / 1024).toFixed(2)} KB`);
 }

@@ -5,15 +5,15 @@ import { SEMANTIC_GRAPH_PATH, SEMANTIC_GRAPH_FILENAME, CONFIG_PATH } from "../co
 /**
  * Executes the core pipeline: fetches data from Engram, builds the graph, and saves it to disk.
  */
-export async function runGenerateGraphAction(): Promise<{ nodeCount: number; edgeCount: number }> {
-    console.log("🔄 Fetching memory data from Engram and building graph...");
+export async function runGenerateGraphAction(options?: { minify?: boolean }) {
+    const graph = buildKnowledgeGraph();
+    const minify = options?.minify ?? true;
 
-    const graphJson = buildKnowledgeGraph();
-    saveKnowledgeGraph(graphJson, SEMANTIC_GRAPH_PATH);
+    saveKnowledgeGraph(graph, SEMANTIC_GRAPH_PATH, { minify });
 
     return {
-        nodeCount: graphJson.nodes.length,
-        edgeCount: graphJson.edges.length,
+        nodeCount: graph.nodes.length,
+        edgeCount: graph.edges.length
     };
 }
 
