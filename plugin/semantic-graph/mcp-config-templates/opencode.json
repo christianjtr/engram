@@ -1,0 +1,9 @@
+{
+  "mcp": {
+    "engram-semantic-graph": {
+      "type": "local",
+      "command": ["node", "/absolute/path/to/node_modules/engram-semantic-graph/dist/semantic-graph.js", "--mcp"],
+      "enabled": true
+    }
+  }
+}
