@@ -46,48 +46,6 @@ server.tool(
 );
 
 /**
- * 2. Tool: Extract active architectural constraints
- */
-server.tool(
-    "get_active_constraints",
-    "Extracts all nodes classified with the CONSTRAINT reasoning role for a project.",
-    {
-        projectName: z
-            .string()
-            .describe("The project name to filter architectural constraints."),
-    },
-    async ({ projectName }) => {
-        const graph = buildKnowledgeGraph(projectName);
-
-        const constraints = graph.nodes.filter(
-            (node) => node.value?.reasoning_role === "CONSTRAINT"
-        );
-
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: JSON.stringify(
-                        {
-                            project: projectName,
-                            total_constraints: constraints.length,
-                            constraints: constraints.map((c) => ({
-                                id: c.v,
-                                title: c.value.title || c.value.name,
-                                content: c.value.content,
-                                type: c.value.type,
-                            })),
-                        },
-                        null,
-                        2
-                    ),
-                },
-            ],
-        };
-    }
-);
-
-/**
  * Exportable runner function for the entry point
  */
 export async function startMcpServer(): Promise<void> {

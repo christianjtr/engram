@@ -17,10 +17,6 @@
             {
                 "name": "get_project_graph",
                 "description": "Retrieves the full raw knowledge graph structure for a specified project or 'all'. AI models can render this JSON as Mermaid or DOT diagrams."
-            },
-            {
-                "name": "get_active_constraints",
-                "description": "Extracts all active architectural constraints and boundary rules (CONSTRAINT nodes) for the project."
             }
         ],
         "hooks": [
