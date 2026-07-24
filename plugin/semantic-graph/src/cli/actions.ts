@@ -1,15 +1,18 @@
 import fs from "fs";
 import { buildKnowledgeGraph, saveKnowledgeGraph } from "../core/builder";
-import { SEMANTIC_GRAPH_PATH, SEMANTIC_GRAPH_FILENAME, CONFIG_PATH } from "../config";
+import { getSemanticGraphPath, getSemanticGraphFilename } from "../config";
+import { getCurrentProjectName } from "../utils/helpers";
 
 /**
  * Executes the core pipeline: fetches data from Engram, builds the graph, and saves it to disk.
  */
-export async function runGenerateGraphAction(options?: { minify?: boolean }) {
-    const graph = buildKnowledgeGraph();
+export async function runGenerateGraphAction(options?: { minify?: boolean; all?: boolean }) {
+    const projectName = options?.all ? "all" : getCurrentProjectName();
+    const graph = buildKnowledgeGraph(projectName);
     const minify = options?.minify ?? true;
 
-    saveKnowledgeGraph(graph, SEMANTIC_GRAPH_PATH, { minify });
+    const graphPath = getSemanticGraphPath(projectName);
+    saveKnowledgeGraph(graph, graphPath, { minify });
 
     return {
         nodeCount: graph.nodes.length,
@@ -20,15 +23,26 @@ export async function runGenerateGraphAction(options?: { minify?: boolean }) {
 /**
  * Checks the environment status, config, and current graph file health.
  */
-export function runStatsAction(): { configExists: boolean; graphExists: boolean; configPath: string; graphPath: string } {
-    const configExists = fs.existsSync(CONFIG_PATH);
-    const graphExists = fs.existsSync(SEMANTIC_GRAPH_PATH);
+export function runStatsAction(): { 
+    projectName: string; 
+    graphPath: string; 
+    graphExists: boolean;
+    allGraphPath: string;
+    allGraphExists: boolean;
+} {
+    const projectName = getCurrentProjectName();
+    const graphPath = getSemanticGraphPath(projectName);
+    const graphExists = fs.existsSync(graphPath);
+
+    const allGraphPath = getSemanticGraphPath("all");
+    const allGraphExists = fs.existsSync(allGraphPath);
 
     return {
-        configExists,
+        projectName,
+        graphPath,
         graphExists,
-        configPath: CONFIG_PATH,
-        graphPath: SEMANTIC_GRAPH_PATH,
+        allGraphPath,
+        allGraphExists
     };
 }
 
@@ -36,9 +50,13 @@ export function runStatsAction(): { configExists: boolean; graphExists: boolean;
  * Displays guidance on delegating graph exports to the AI Agent.
  */
 export function runExportInfoAction(): void {
+    const projectName = getCurrentProjectName();
+    const filename = getSemanticGraphFilename(projectName);
+    const allFilename = getSemanticGraphFilename("all");
     console.log(`\n🤖 Knowledge Graph Export Information:`);
-    console.log(`   The generated semantic graph is stored in standard JSON format (${SEMANTIC_GRAPH_FILENAME}.json).`);
+    console.log(`   - Project Graph:  ${filename}.json`);
+    console.log(`   - Global Graph:   ${allFilename}.json`);
     console.log(`   No extra built-in exporters are required.`);
-    console.log(`   AI Agents can directly consume this JSON file to render diagrams (Mermaid, DOT/Graphviz)`);
+    console.log(`   AI Agents can directly consume these JSON files to render diagrams (Mermaid, DOT/Graphviz)`);
     console.log(`   or produce Markdown summaries on demand.\n`);
 }

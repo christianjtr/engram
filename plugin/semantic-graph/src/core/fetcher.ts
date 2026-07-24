@@ -1,6 +1,6 @@
 import fs from "fs";
 import { execSync } from "child_process";
-import { ENGRAM_DIR, TEMP_EXPORT_PATH } from "../config";
+import { ENGRAM_DIR, getTempExportPath } from "../config";
 import type { GenericRecord } from "../utils/helpers";
 
 export interface EngramExportData {
@@ -9,7 +9,8 @@ export interface EngramExportData {
     mutations: GenericRecord[];
 }
 
-export function fetchEngramData(targetPath: string = TEMP_EXPORT_PATH): EngramExportData {
+export function fetchEngramData(projectName: string, customPath?: string): EngramExportData {
+    const targetPath = customPath || getTempExportPath(projectName);
     if (!fs.existsSync(ENGRAM_DIR)) {
         fs.mkdirSync(ENGRAM_DIR, { recursive: true });
     }

@@ -10,8 +10,9 @@ export async function main(): Promise<void> {
 
     // Direct execution flag to bypass CLI menu
     if (args.includes("--generate") || args.includes("-g")) {
-        console.log("⚡ Generating semantic graph directly...");
-        await runGenerateGraphAction({ minify: true });
+        const generateAll = args.includes("--all") || args.includes("-a");
+        console.log(`⚡ Generating semantic graph directly (${generateAll ? "all projects" : "current project"})...`);
+        await runGenerateGraphAction({ minify: true, all: generateAll });
         console.log("✨ Graph generated successfully!");
         return;
     }

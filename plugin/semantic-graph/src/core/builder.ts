@@ -1,13 +1,14 @@
 import fs from "fs";
-import { Graph, json } from "graphlib";
 import type {
     SemanticGraphConfig,
     GraphLibJson,
+    GraphLibNode,
+    GraphLibEdge,
     ReasoningRole,
-    ReasoningRoleMappings
+    ReasoningRoleMappings,
 } from "../types";
 import { NODE_LEVEL_MAP } from "../types";
-import { SEMANTIC_GRAPH_PATH, resolveConfig } from "../config";
+import { resolveConfig } from "../config";
 import { DEFAULT_REASONING_MAPPINGS } from "../config/semantics";
 import { generateMD5Hash } from "../utils/helpers";
 import { fetchEngramData } from "./fetcher";
@@ -35,48 +36,92 @@ export function resolveReasoningRole(
     if (constraintTypes.includes(normalizedType)) {
         return "CONSTRAINT";
     }
-
     if (historyTypes.includes(normalizedType)) {
         return "HISTORICAL_RECORD";
     }
-
     return "FACT";
 }
 
 /**
- * Builds the native Graphlib knowledge graph with embedded AI reasoning roles and category pruning.
+ * Builds the native Graphlib knowledge graph matching strict GraphLibJson specifications.
  */
-export function buildKnowledgeGraph(config?: SemanticGraphConfig): GraphLibJson {
+export function buildKnowledgeGraph(projectName: string, config?: SemanticGraphConfig): GraphLibJson {
     const activeConfig = resolveConfig(config);
-    const rawData = fetchEngramData();
+    const rawData = fetchEngramData(projectName);
     const categoryExclusions = activeConfig.category_exclusions || [];
     const mappings = DEFAULT_REASONING_MAPPINGS;
 
-    const g = new Graph({ directed: true, multigraph: true });
+    const currentProjectName = projectName;
+
+    const nodesList: GraphLibNode[] = [];
+    const edgesList: GraphLibEdge[] = [];
+    const seenNodes = new Set<string>();
+
     const sessionHashMap = new Map<string, string>();
     const obsSyncIdToHash = new Map<string, string>();
 
-    /** Helper to lazily ensure a PROJECT node exists in the graph */
+    const registerNode = (id: string, value: Record<string, unknown>): void => {
+        if (!seenNodes.has(id)) {
+            seenNodes.add(id);
+            nodesList.push({ v: id, value });
+        }
+    };
+
+    /** Helper to register connections under the GraphLibEdge interface */
+    const registerEdge = (v: string, w: string, name: string, value: Record<string, unknown>): void => {
+        edgesList.push({ v, w, name, value });
+    };
+
+    /** Helper lazily mapping PROJECT nodes */
     const ensureProjectNode = (projectName: string): string | null => {
         if (categoryExclusions.includes("PROJECT")) return null;
 
         const projectHash = generateMD5Hash(`project-${projectName}`);
-        if (!g.hasNode(projectHash)) {
-            g.setNode(projectHash, {
-                category: "PROJECT",
-                level: NODE_LEVEL_MAP.PROJECT,
-                reasoning_role: resolveReasoningRole(undefined, "PROJECT", mappings),
-                name: projectName
-            });
-        }
+        registerNode(projectHash, {
+            category: "PROJECT",
+            level: NODE_LEVEL_MAP.PROJECT,
+            reasoning_role: resolveReasoningRole(undefined, "PROJECT", mappings),
+            name: projectName
+        });
         return projectHash;
     };
 
-    // Processing pipeline with category filtering
+    /** Helper lazily mapping GLOBAL_CONTEXT nodes */
+    const ensureGlobalContextNode = (): string | null => {
+        if (categoryExclusions.includes("PROJECT")) return null;
+
+        const globalHash = generateMD5Hash("scope-global-context-root");
+        registerNode(globalHash, {
+            category: "PROJECT",
+            level: NODE_LEVEL_MAP.PROJECT,
+            reasoning_role: "FACT" as ReasoningRole,
+            name: "GLOBAL_CONTEXT",
+            content: "Global and personal shared cross-project conventions environment."
+        });
+        return globalHash;
+    };
+
+    // 🌟 PHYSICAL FILTERING: Strict isolation of local sessions
+    const filteredSessions = (rawData.sessions || []).filter(
+        (s: any) => currentProjectName === "all" || String(s.project).toLowerCase() === currentProjectName.toLowerCase()
+    );
+
+    // 🌟 PHYSICAL FILTERING: Avoid soft-deleted nodes and include shared scopes
+    const filteredObservations = (rawData.observations || []).filter((o: any) => {
+        if (o.deleted_at !== null && o.deleted_at !== undefined) return false;
+
+        if (currentProjectName === "all") return true;
+
+        const scope = String(o.scope || "project").toLowerCase();
+        const project = String(o.project || "");
+
+        return project.toLowerCase() === currentProjectName.toLowerCase() || scope === "global" || scope === "personal";
+    });
+    // Structured injection pipeline conforming to GraphLib types
     const pipeline = [
         {
             category: "SESSION",
-            items: rawData.sessions,
+            items: filteredSessions,
             handler: (session: Record<string, unknown>) => {
                 if (!session.id) return;
 
@@ -84,7 +129,7 @@ export function buildKnowledgeGraph(config?: SemanticGraphConfig): GraphLibJson 
                 const hashId = generateMD5Hash(`session-${sessionId}`);
 
                 sessionHashMap.set(sessionId, hashId);
-                g.setNode(hashId, {
+                registerNode(hashId, {
                     category: "SESSION",
                     level: NODE_LEVEL_MAP.SESSION,
                     reasoning_role: resolveReasoningRole(undefined, "SESSION", mappings),
@@ -94,14 +139,15 @@ export function buildKnowledgeGraph(config?: SemanticGraphConfig): GraphLibJson 
                 if (session.project) {
                     const projectHash = ensureProjectNode(String(session.project));
                     if (projectHash) {
-                        g.setEdge(hashId, projectHash, { type: "BELONGS_TO" }, "BELONGS_TO");
+                        // Hierarchical Connection: PROJECT ➔ SESSION
+                        registerEdge(projectHash, hashId, `belongs:${projectHash}:${hashId}`, { type: "BELONGS_TO" });
                     }
                 }
             }
         },
         {
             category: "OBSERVATION",
-            items: rawData.observations,
+            items: filteredObservations,
             handler: (obs: Record<string, unknown>) => {
                 if (!obs.id) return;
 
@@ -111,26 +157,70 @@ export function buildKnowledgeGraph(config?: SemanticGraphConfig): GraphLibJson 
                 if (obs.sync_id) obsSyncIdToHash.set(String(obs.sync_id), hashId);
 
                 const nodeType = obs.type ? String(obs.type) : undefined;
+                const scope = String(obs.scope || "project").toLowerCase();
+                const topicKey = obs.topic_key ? String(obs.topic_key) : undefined;
 
-                g.setNode(hashId, {
+                registerNode(hashId, {
                     category: "OBSERVATION",
                     level: NODE_LEVEL_MAP.OBSERVATION,
                     reasoning_role: resolveReasoningRole(nodeType, "OBSERVATION", mappings),
                     ...obs
                 });
 
+                // Ordinary Hierarchical Connection: SESSION ➔ OBSERVATION
                 if (obs.session_id) {
                     const sessionHash = sessionHashMap.get(String(obs.session_id));
                     if (sessionHash) {
-                        g.setEdge(hashId, sessionHash, { type: "OCCURRED_IN" }, "OCCURRED_IN");
+                        registerEdge(sessionHash, hashId, `occurred:${sessionHash}:${hashId}`, { type: "OCCURRED_IN" });
                     }
                 }
 
-                if (obs.project) {
+                // =================================================================
+                // 🌐 NATIVE SCOPE ROUTING (Based on schema)
+                // =================================================================
+                if (scope === "global" || scope === "personal") {
+                    const globalHash = ensureGlobalContextNode();
+                    if (globalHash) {
+                        // Global shortcut to the center of gravity
+                        registerEdge(hashId, globalHash, `global-belongs:${hashId}:${globalHash}`, { type: "BELONGS_TO" });
+
+                        // Direct inheritance bridge with the active project
+                        if (currentProjectName !== "all") {
+                            const activeProjectHash = ensureProjectNode(currentProjectName);
+                            if (activeProjectHash) {
+                                registerEdge(hashId, activeProjectHash, `inherited:${hashId}:${activeProjectHash}`, {
+                                    type: "CO_OCCURRENCE",
+                                    reason: "Global pattern inherited by current workspace"
+                                });
+                            }
+                        }
+                    }
+                } else if (obs.project) {
                     const projectHash = ensureProjectNode(String(obs.project));
                     if (projectHash) {
-                        g.setEdge(hashId, projectHash, { type: "BELONGS_TO" }, "BELONGS_TO");
+                        // Fast hierarchical shortcut approved: OBSERVATION ➔ PROJECT
+                        registerEdge(hashId, projectHash, `belongs:${hashId}:${projectHash}`, { type: "BELONGS_TO" });
                     }
+                }
+
+                // =================================================================
+                // 🔄 EVOLUTIONARY TOPIC CLUSTER (Managing topic_key)
+                // =================================================================
+                if (topicKey) {
+                    const topicHash = generateMD5Hash(`topic-${topicKey.toLowerCase()}`);
+                    registerNode(topicHash, {
+                        category: "OBSERVATION",
+                        level: NODE_LEVEL_MAP.OBSERVATION,
+                        reasoning_role: "FACT" as ReasoningRole,
+                        title: `Topic: ${topicKey}`,
+                        content: `Evolving decision context workspace cluster tracking updates for: ${topicKey}`
+                    });
+
+                    // Connect the observation to its evolutionary decision timeline
+                    registerEdge(hashId, topicHash, `topic-link:${hashId}:${topicHash}`, {
+                        type: "CO_OCCURRENCE",
+                        reason: "Belongs to topic evolutionary line"
+                    });
                 }
             }
         },
@@ -145,19 +235,18 @@ export function buildKnowledgeGraph(config?: SemanticGraphConfig): GraphLibJson 
                 const sourceHash = obsSyncIdToHash.get(String(payload.source_id));
                 const targetHash = obsSyncIdToHash.get(String(payload.target_id));
 
-                if (sourceHash && targetHash && g.hasNode(sourceHash) && g.hasNode(targetHash)) {
+                if (sourceHash && targetHash && seenNodes.has(sourceHash) && seenNodes.has(targetHash)) {
                     const edgeName = `relation:${sourceHash}:${targetHash}:${index}`;
-                    g.setEdge(
-                        sourceHash,
-                        targetHash,
-                        { type: "CO_OCCURRENCE", ...payload },
-                        edgeName
-                    );
+                    registerEdge(sourceHash, targetHash, edgeName, {
+                        type: "CO_OCCURRENCE",
+                        ...payload
+                    });
                 }
             }
         }
     ];
 
+    // Controlled execution of the pipeline
     for (const step of pipeline) {
         if (step.category !== "MUTATION" && categoryExclusions.includes(step.category)) {
             continue;
@@ -165,19 +254,27 @@ export function buildKnowledgeGraph(config?: SemanticGraphConfig): GraphLibJson 
         (step.items || []).forEach((item, index) => step.handler(item as Record<string, unknown>, index));
     }
 
-    return json.write(g) as GraphLibJson;
+    // 🌟 FINAL FORMATTING: Return the exact structure of the GraphLibJson interface
+    return {
+        options: {
+            directed: true,
+            multigraph: true,
+            compound: false
+        },
+        nodes: nodesList,
+        edges: edgesList
+    };
 }
 
 /**
  * Saves the generated knowledge graph to disk in native Graphlib JSON format.
  */
-
 export interface SaveGraphOptions {
     /** Whether to minify the JSON output. Defaults to true. */
     minify?: boolean;
 }
 
-export function saveKnowledgeGraph(graphJson: GraphLibJson, outputPath: string = SEMANTIC_GRAPH_PATH, options?: SaveGraphOptions): void {
+export function saveKnowledgeGraph(graphJson: GraphLibJson, outputPath: string, options?: SaveGraphOptions): void {
     const { minify = true } = options || {};
 
     const jsonContent = minify

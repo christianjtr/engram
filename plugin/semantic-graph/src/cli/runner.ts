@@ -46,6 +46,27 @@ export async function runCliMenu(): Promise<void> {
         }
 
         if (action === "generate") {
+            const scopeOption = await select({
+                message: "Select scope to generate:",
+                options: [
+                    {
+                        value: "project",
+                        label: "🎯 Active Project Only",
+                        hint: "Scoped strictly to the current workspace project"
+                    },
+                    {
+                        value: "all",
+                        label: "🌐 Global Multi-Project Graph",
+                        hint: "Consolidated graph combining all sessions, topics, and scopes"
+                    }
+                ]
+            });
+
+            if (isCancel(scopeOption)) {
+                cancel("Operation cancelled.");
+                process.exit(0);
+            }
+
             const formatOption = await select({
                 message: "Select output JSON format:",
                 options: [
@@ -68,12 +89,13 @@ export async function runCliMenu(): Promise<void> {
             }
 
             const shouldMinify = formatOption as boolean;
+            const generateAll = scopeOption === "all";
 
             const s = spinner();
             s.start("Generating knowledge graph...");
 
             try {
-                const stats = await runGenerateGraphAction({ minify: shouldMinify });
+                const stats = await runGenerateGraphAction({ minify: shouldMinify, all: generateAll });
                 s.stop(`✨ Knowledge graph generated successfully! (${shouldMinify ? "minified" : "pretty-printed"})`);
 
                 console.log(`\n📊 Summary:`);
@@ -92,7 +114,9 @@ export async function runCliMenu(): Promise<void> {
             const status = runStatsAction();
 
             console.log(`\n🔍 Environment Status:`);
-            console.log(`   - Graph Path:  ${status.graphPath} [${status.graphExists ? "Generated" : "Not Found"}]`);
+            console.log(`   - Current Project: ${status.projectName}`);
+            console.log(`   - Project Graph:   ${status.graphPath} [${status.graphExists ? "Generated" : "Not Found"}]`);
+            console.log(`   - Global Graph:    ${status.allGraphPath} [${status.allGraphExists ? "Generated" : "Not Found"}]`);
         } else if (action === "exit") {
             keepRunning = false;
         }
