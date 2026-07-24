@@ -1,7 +1,7 @@
 import fs from "fs";
 import { execSync } from "child_process";
-import { ENGRAM_DIR, getTempExportPath } from "../config";
-import type { GenericRecord } from "../utils/helpers";
+import { ENGRAM_DIR, getTempExportPath } from "../../config";
+import type { GenericRecord } from "../../utils/helpers";
 
 export interface EngramExportData {
     sessions: GenericRecord[];

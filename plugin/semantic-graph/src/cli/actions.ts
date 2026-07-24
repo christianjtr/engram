@@ -23,9 +23,9 @@ export async function runGenerateGraphAction(options?: { minify?: boolean; all?:
 /**
  * Checks the environment status, config, and current graph file health.
  */
-export function runStatsAction(): { 
-    projectName: string; 
-    graphPath: string; 
+export function runStatsAction(): {
+    projectName: string;
+    graphPath: string;
     graphExists: boolean;
     allGraphPath: string;
     allGraphExists: boolean;
