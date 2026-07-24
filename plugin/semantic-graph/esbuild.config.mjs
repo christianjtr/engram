@@ -20,6 +20,9 @@ const context = await esbuild.context({
     treeShaking: true,
     outdir: "dist",
     minify: isProd,
+    banner: {
+        js: "#!/usr/bin/env node",
+    },
 });
 
 if (isWatch) {

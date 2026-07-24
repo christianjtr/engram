@@ -3,9 +3,13 @@
   "version": "1.0.0",
   "description": "Deterministic semantic knowledge graph plugin for Engram via MCP",
   "main": "dist/semantic-graph.js",
+  "bin": {
+    "engram-semantic-graph": "dist/semantic-graph.js"
+  },
   "private": true,
   "files": [
     "dist",
+    "mcp-config-templates",
     "README.md"
   ],
   "scripts": {
@@ -15,6 +19,8 @@
     "dev": "node esbuild.config.mjs --watch",
     "start": "node dist/semantic-graph.js",
     "generate": "node dist/semantic-graph.js --generate",
+    "mcp": "node dist/semantic-graph.js --mcp",
+    "init": "node dist/semantic-graph.js --init",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
@@ -23,7 +29,7 @@
     "ai",
     "mcp-server",
     "knowledge-graph",
-    "semantic-graph-plugin"
+    "semantic-graph"
   ],
   "author": "Christian Torrealba <christianjtr>",
   "license": "MIT",
