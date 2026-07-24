@@ -22,7 +22,8 @@
     "memory",
     "ai",
     "mcp-server",
-    "knowledge-graph"
+    "knowledge-graph",
+    "semantic-graph-plugin"
   ],
   "author": "Christian Torrealba <christianjtr>",
   "license": "MIT",
