@@ -5,7 +5,13 @@ export type ReasoningRole = "CONSTRAINT" | "FACT" | "HISTORICAL_RECORD";
 
 /**
  * Hierarchical levels for structural data mapping in the graph.
- * 0: Project, 1: Session, 2: Observation
+ *   0 — Project scope   (PROJECT nodes, including the synthetic GLOBAL_CONTEXT root)
+ *   1 — Session scope   (SESSION nodes)
+ *   2 — Observation scope (OBSERVATION nodes, including synthetic TOPIC_CLUSTER nodes)
+ *
+ * Synthetic nodes reuse existing levels and are differentiated by the `type` field:
+ *   - GLOBAL_CONTEXT root: category="PROJECT", type="global_context", is_synthetic=true
+ *   - Topic cluster:       category="OBSERVATION", type="topic_cluster", is_synthetic=true
  */
 export type NodeLevel = 0 | 1 | 2;
 
