@@ -25,20 +25,13 @@ Update an existing registration:
 npx engram-semantic-graph --init --force
 ```
 
-Target one agent:
-
-```bash
-npx engram-semantic-graph --init --agent=opencode
-```
-
 ## What you get
 
 Independent MCP server name: **`engram-semantic-graph`**
 
 | Tool | Purpose |
 |------|---------|
-| `get_project_graph` | Full Graphlib knowledge graph for a project (or `all`) — use for Mermaid / DOT |
-| `get_active_constraints` | Nodes with `reasoning_role = CONSTRAINT` |
+| `get_project_graph` | Enriched knowledge graph for a project (or `all`) — includes `summary`, `timeline`, and full `graph` block for Mermaid / DOT |
 
 ## Commands
 
@@ -70,7 +63,7 @@ Templates (placeholders only): [`mcp-config-templates/`](./mcp-config-templates/
 }
 ```
 
-**Claude / Cursor / Windsurf** (`mcpServers`):
+**Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 
 ```json
 {
@@ -83,11 +76,47 @@ Templates (placeholders only): [`mcp-config-templates/`](./mcp-config-templates/
 }
 ```
 
-**VS Code Copilot** (`servers` + `type: "stdio"`): see `mcp-config-templates/vscode.json`.
+**Cursor** (`~/.cursor/mcp.json`) and **Windsurf** (`~/.codeium/windsurf/mcp_config.json`) use the same `mcpServers` format above.
 
-## Supported agents (via `--init`)
+**VS Code** (`~/Library/Application Support/Code/User/mcp.json`) — uses `servers` key and requires `type: "stdio"`:
 
-OpenCode, Claude Code, Cursor, Windsurf, VS Code, Gemini CLI, Antigravity, Qwen, Kiro, Kilo Code.
+```json
+{
+  "servers": {
+    "engram-semantic-graph": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/path/to/node_modules/engram-semantic-graph/dist/semantic-graph.js", "--mcp"]
+    }
+  }
+}
+```
+
+**Claude Code CLI** — does not use a JSON config file. Register manually:
+
+```bash
+claude mcp add engram-semantic-graph node /path/to/dist/semantic-graph.js --mcp
+```
+
+## Supported agents
+
+### Auto-configured via `--init`
+
+| Agent | Config written |
+|-------|---------------|
+| OpenCode (local project) | `<cwd>/.opencode/opencode.json` |
+| OpenCode (global) | `~/.config/opencode/opencode.json` |
+| Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Cursor | `~/.cursor/mcp.json` |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json` |
+| VS Code | `~/Library/Application Support/Code/User/mcp.json` |
+
+Agents whose config directory does not exist are skipped with a warning.
+
+### Manual config only
+
+- **Claude Code CLI**: `claude mcp add engram-semantic-graph node /path/to/dist/semantic-graph.js --mcp`
+- **Gemini CLI, Kiro, Kilo Code, Antigravity, Qwen**: see [`mcp-config-templates/`](./mcp-config-templates/) for reference snippets.
 
 ## Architecture
 

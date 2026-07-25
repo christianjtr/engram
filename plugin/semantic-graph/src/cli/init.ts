@@ -18,7 +18,7 @@ interface McpEntry {
 interface AgentTarget {
     name: string;
     path: string;
-    format: "opencode" | "mcpServers";
+    format: "opencode" | "mcpServers" | "vscode";
 }
 
 function getAgents(mode: "local" | "global" | "all"): AgentTarget[] {
@@ -33,13 +33,15 @@ function getAgents(mode: "local" | "global" | "all"): AgentTarget[] {
 
     const globalAgents: AgentTarget[] = [
         {
-            name: "OpenCode (Global macOS)",
+            name: "OpenCode (Global)",
             path: join(home, ".config", "opencode", "opencode.json"),
             format: "opencode",
         },
         {
-            name: "Claude Code",
-            path: join(home, ".claude", "mcp", "semantic-graph.json"),
+            // Claude Desktop app — reads claude_desktop_config.json on startup.
+            // Claude Code CLI users: run `claude mcp add` manually (see outro).
+            name: "Claude Desktop",
+            path: join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json"),
             format: "mcpServers",
         },
         {
@@ -51,6 +53,12 @@ function getAgents(mode: "local" | "global" | "all"): AgentTarget[] {
             name: "Windsurf",
             path: join(home, ".codeium", "windsurf", "mcp_config.json"),
             format: "mcpServers",
+        },
+        {
+            // VS Code uses key "servers" (not "mcpServers") and requires type: "stdio".
+            name: "VS Code",
+            path: join(home, "Library", "Application Support", "Code", "User", "mcp.json"),
+            format: "vscode",
         },
     ];
 
@@ -84,7 +92,7 @@ function readJsonObject(filePath: string): Record<string, unknown> {
     return {};
 }
 
-function writeJsonObject(filePath: string, data: Record<string, unknown>, format: "opencode" | "mcpServers"): void {
+function writeJsonObject(filePath: string, data: Record<string, unknown>, format: "opencode" | "mcpServers" | "vscode"): void {
     mkdirSync(dirname(filePath), { recursive: true });
 
     // Inyecta el esquema oficial de OpenCode para autocompletado y validación
@@ -114,7 +122,7 @@ export async function runInit(args: string[] = process.argv.slice(2)): Promise<v
             message: "Where would you like to configure the Engram Semantic Graph MCP server?",
             options: [
                 { value: "local", label: "Local Project (.opencode/opencode.json)", hint: "Configures current working directory for OpenCode" },
-                { value: "global", label: "Global System Agents", hint: "Configures Claude, Cursor, Windsurf, and global OpenCode" },
+                { value: "global", label: "Global System Agents", hint: "Configures Claude Desktop, Cursor, Windsurf, VS Code, and global OpenCode" },
                 { value: "all", label: "Both Local & Global", hint: "Configures current project and all global system agents" },
             ],
         });
@@ -135,6 +143,7 @@ export async function runInit(args: string[] = process.argv.slice(2)): Promise<v
 
     for (const agent of agents) {
         if (agent.format !== "opencode" && !existsSync(dirname(agent.path))) {
+            p.log.warn(`Skipped ${agent.name} — directory not found: ${dirname(agent.path)}`);
             continue;
         }
 
@@ -153,6 +162,21 @@ export async function runInit(args: string[] = process.argv.slice(2)): Promise<v
                     type: "local",
                     command: ["node", LOCAL_PLUGIN_PATH, "--mcp"],
                     enabled: true,
+                },
+            };
+        } else if (agent.format === "vscode") {
+            const existingServers = (config.servers && typeof config.servers === "object" && !Array.isArray(config.servers))
+                ? (config.servers as Record<string, McpEntry>)
+                : {};
+
+            if (existingServers[SERVER_NAME] && !force) continue;
+
+            config.servers = {
+                ...existingServers,
+                [SERVER_NAME]: {
+                    type: "stdio",
+                    command: "node",
+                    args: [LOCAL_PLUGIN_PATH, "--mcp"],
                 },
             };
         } else {
@@ -182,5 +206,12 @@ export async function runInit(args: string[] = process.argv.slice(2)): Promise<v
         p.note("No files were updated. Configurations already exist (use --force to overwrite).");
     }
 
-    p.outro("Setup complete! Restart OpenCode or your agents to load the tools.");
+    if (targetMode === "global" || targetMode === "all") {
+        p.note(
+            `Claude Code CLI is not auto-configured (it does not use a JSON config file).\nTo register manually, run:\n\n  claude mcp add ${SERVER_NAME} node ${LOCAL_PLUGIN_PATH} --mcp`,
+            "Claude Code CLI — manual step"
+        );
+    }
+
+    p.outro("Setup complete! Restart your agents to load the MCP tools.");
 }
