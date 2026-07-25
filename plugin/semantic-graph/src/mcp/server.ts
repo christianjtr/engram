@@ -6,10 +6,12 @@ import { z } from "zod";
 
 import { buildKnowledgeGraph } from "../core/builder";
 
+declare const __PLUGIN_VERSION__: string;
+
 // Instantiate the MCP Server
 const server = new McpServer({
     name: "engram-semantic-graph-mcp",
-    version: "1.0.0",
+    version: __PLUGIN_VERSION__,
 });
 
 /**

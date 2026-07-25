@@ -257,20 +257,21 @@ export function buildKnowledgeGraph(
 }
 
 /**
- * Saves the generated knowledge graph to disk in native Graphlib JSON format.
+ * Saves the full enriched graph payload to disk (summary + timeline + graph).
+ * Consumers reading from disk get the same structure as the MCP tool response.
  */
 export function saveKnowledgeGraph(
-    graphJson: GraphLibJson,
+    payload: EnrichedGraphPayload,
     outputPath: string,
     options?: SaveGraphOptions
 ): void {
     const { minify = true } = options ?? {};
     const jsonContent = minify
-        ? JSON.stringify(graphJson)
-        : JSON.stringify(graphJson, null, 2);
+        ? JSON.stringify(payload)
+        : JSON.stringify(payload, null, 2);
 
     fs.writeFileSync(outputPath, jsonContent, "utf-8");
     console.log(
-        `Knowledge graph saved successfully using Graphlib native schema. Size: ${(jsonContent.length / 1024).toFixed(2)} KB`
+        `Knowledge graph saved successfully. Nodes: ${payload.graph.nodes.length}, Edges: ${payload.graph.edges.length}, Size: ${(jsonContent.length / 1024).toFixed(2)} KB`
     );
 }

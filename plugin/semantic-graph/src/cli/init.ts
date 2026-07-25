@@ -21,9 +21,35 @@ interface AgentTarget {
     format: "opencode" | "mcpServers" | "vscode";
 }
 
+/**
+ * Resolves OS-specific config paths for agents that differ across platforms.
+ * process.platform: "darwin" | "linux" | "win32"
+ */
+function resolveAgentPaths(home: string): { claudeDesktop: string; vscode: string } {
+    switch (process.platform) {
+        case "win32":
+            return {
+                claudeDesktop: join(home, "AppData", "Roaming", "Claude", "claude_desktop_config.json"),
+                vscode: join(home, "AppData", "Roaming", "Code", "User", "mcp.json"),
+            };
+        case "linux":
+            return {
+                claudeDesktop: join(home, ".config", "Claude", "claude_desktop_config.json"),
+                vscode: join(home, ".config", "Code", "User", "mcp.json"),
+            };
+        case "darwin":
+        default:
+            return {
+                claudeDesktop: join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json"),
+                vscode: join(home, "Library", "Application Support", "Code", "User", "mcp.json"),
+            };
+    }
+}
+
 function getAgents(mode: "local" | "global" | "all"): AgentTarget[] {
     const home = homedir();
     const currentDir = process.cwd();
+    const { claudeDesktop, vscode } = resolveAgentPaths(home);
 
     const localAgent: AgentTarget = {
         name: "OpenCode (Local Project)",
@@ -41,7 +67,7 @@ function getAgents(mode: "local" | "global" | "all"): AgentTarget[] {
             // Claude Desktop app — reads claude_desktop_config.json on startup.
             // Claude Code CLI users: run `claude mcp add` manually (see outro).
             name: "Claude Desktop",
-            path: join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json"),
+            path: claudeDesktop,
             format: "mcpServers",
         },
         {
@@ -57,7 +83,7 @@ function getAgents(mode: "local" | "global" | "all"): AgentTarget[] {
         {
             // VS Code uses key "servers" (not "mcpServers") and requires type: "stdio".
             name: "VS Code",
-            path: join(home, "Library", "Application Support", "Code", "User", "mcp.json"),
+            path: vscode,
             format: "vscode",
         },
     ];

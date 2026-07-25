@@ -1,9 +1,12 @@
 import esbuild from "esbuild";
 import process from "process";
 import builtins from "builtin-modules";
+import { readFileSync } from "fs";
 
 const isProd = process.argv.includes("--production") || process.env.NODE_ENV === "production";
 const isWatch = process.argv.includes("--watch");
+
+const { version } = JSON.parse(readFileSync("./package.json", "utf-8"));
 
 const context = await esbuild.context({
     entryPoints: { "semantic-graph": "src/index.ts" },
@@ -15,6 +18,9 @@ const context = await esbuild.context({
         "@modelcontextprotocol/sdk",
         ...builtins
     ],
+    define: {
+        "__PLUGIN_VERSION__": JSON.stringify(version),
+    },
     logLevel: "info",
     sourcemap: !isProd ? "inline" : false,
     treeShaking: true,

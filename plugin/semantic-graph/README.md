@@ -47,7 +47,16 @@ npx engram-semantic-graph --generate --all
 
 `init` writes an absolute `node …/dist/semantic-graph.js --mcp` entry so agents work from any cwd.
 
-Templates (placeholders only): [`mcp-config-templates/`](./mcp-config-templates/).
+Reference snippets (content to merge into each agent's config file — not standalone files):
+[`mcp-config-templates/`](./mcp-config-templates/).
+
+| Template file | Merge into |
+|---------------|-----------|
+| `claude.json` | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) |
+| `opencode.json` | `~/.config/opencode/opencode.json` or `<project>/.opencode/opencode.json` |
+| `cursor.json` | `~/.cursor/mcp.json` |
+| `windsurf.json` | `~/.codeium/windsurf/mcp_config.json` |
+| `vscode.json` | `~/Library/Application Support/Code/User/mcp.json` (macOS) |
 
 **OpenCode** (`~/.config/opencode/opencode.json`):
 

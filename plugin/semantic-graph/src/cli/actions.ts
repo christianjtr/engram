@@ -12,7 +12,7 @@ export async function runGenerateGraphAction(options?: { minify?: boolean; all?:
     const minify = options?.minify ?? true;
 
     const graphPath = getSemanticGraphPath(projectName);
-    saveKnowledgeGraph(result.graph, graphPath, { minify });
+    saveKnowledgeGraph(result, graphPath, { minify });
 
     return {
         nodeCount: result.graph.nodes.length,

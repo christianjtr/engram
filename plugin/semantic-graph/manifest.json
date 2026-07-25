@@ -16,12 +16,8 @@
         "tools": [
             {
                 "name": "get_project_graph",
-                "description": "Retrieves the full raw knowledge graph structure for a specified project or 'all'. AI models can render this JSON as Mermaid or DOT diagrams."
+                "description": "Retrieves the enriched knowledge graph for a project or 'all' — includes summary, timeline, and full graph block for Mermaid / DOT rendering."
             }
-        ],
-        "hooks": [
-            "session-start",
-            "post-compaction"
         ]
     }
 }
