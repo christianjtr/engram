@@ -50,6 +50,14 @@ server.tool(
  */
 export async function startMcpServer(): Promise<void> {
     const transport = new StdioServerTransport();
+
+    // Handling graceful shutdown
+    process.on("SIGINT", async () => {
+        console.error("Shutting down MCP server...");
+        await server.close();
+        process.exit(0);
+    });
+
     await server.connect(transport);
     console.error("Engram Semantic Graph MCP Server running on stdio.");
 }

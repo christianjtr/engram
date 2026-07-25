@@ -2,20 +2,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import * as p from "@clack/prompts";
 
+const LOCAL_PLUGIN_PATH = join(__dirname, "semantic-graph.js");
 const SERVER_NAME = "engram-semantic-graph";
-const LOCAL_PLUGIN_PATH = join(homedir(), "engram", "plugin", "semantic-graph", "dist", "semantic-graph.js");
-
-const HELP = `engram-semantic-graph init
-
-Usage:
-  npm run init [--force] [--agent=<name>]
-
-Supported agents: opencode, claude, cursor, windsurf, vscode
-`;
 
 interface McpEntry {
-    name?: string;
     type?: string;
     command: string[] | string;
     args?: string[];
@@ -29,13 +21,20 @@ interface AgentTarget {
     format: "opencode" | "mcpServers";
 }
 
-function getAgents(): AgentTarget[] {
+function getAgents(mode: "local" | "global" | "all"): AgentTarget[] {
     const home = homedir();
     const currentDir = process.cwd();
-    return [
+
+    const localAgent: AgentTarget = {
+        name: "OpenCode (Local Project)",
+        path: join(currentDir, ".opencode", "opencode.json"),
+        format: "opencode",
+    };
+
+    const globalAgents: AgentTarget[] = [
         {
-            name: "OpenCode (Local)",
-            path: join(currentDir, ".engram", "opencode.json"),
+            name: "OpenCode (Global macOS)",
+            path: join(home, ".config", "opencode", "opencode.json"),
             format: "opencode",
         },
         {
@@ -54,34 +53,85 @@ function getAgents(): AgentTarget[] {
             format: "mcpServers",
         },
     ];
+
+    if (mode === "local") return [localAgent];
+    if (mode === "global") return globalAgents;
+    return [localAgent, ...globalAgents];
 }
 
 function readJsonObject(filePath: string): Record<string, unknown> {
-    if (!existsSync(filePath)) return {};
+    if (!existsSync(filePath)) {
+        return {};
+    }
+
     try {
-        const parsed = JSON.parse(readFileSync(filePath, "utf-8")) as unknown;
+        const content = readFileSync(filePath, "utf-8").trim();
+        if (!content) {
+            return {};
+        }
+
+        const parsed = JSON.parse(content) as unknown;
         if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
             return parsed as Record<string, unknown>;
         }
-    } catch {
-        // Ignorar si el JSON está corrupto o vacío
+
+        console.error(`⚠ File at ${filePath} does not contain a valid JSON object.`);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`⚠ Error reading or parsing ${filePath}: ${message}`);
     }
+
     return {};
 }
 
-function writeJsonObject(filePath: string, data: unknown): void {
+function writeJsonObject(filePath: string, data: Record<string, unknown>, format: "opencode" | "mcpServers"): void {
     mkdirSync(dirname(filePath), { recursive: true });
+
+    // Inyecta el esquema oficial de OpenCode para autocompletado y validación
+    if (format === "opencode" && !data["$schema"]) {
+        data["$schema"] = "https://opencode.ai/config.json";
+    }
+
     writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf-8");
 }
 
-export function runInit(args: string[] = process.argv.slice(2)): void {
-    if (args.includes("--help") || args.includes("-h")) {
-        console.log(HELP);
-        return;
+export async function runInit(args: string[] = process.argv.slice(2)): Promise<void> {
+    const force = args.includes("--force");
+    let targetMode: "local" | "global" | "all" | null = null;
+
+    if (args.includes("--local") || args.includes("-l")) {
+        targetMode = "local";
+    } else if (args.includes("--global") || args.includes("-g")) {
+        targetMode = "global";
+    } else if (args.includes("--all")) {
+        targetMode = "all";
     }
 
-    const force = args.includes("--force");
-    const agents = getAgents();
+    if (!targetMode) {
+        p.intro("⚡ Engram Semantic Graph Setup");
+
+        const selectedMode = await p.select({
+            message: "Where would you like to configure the Engram Semantic Graph MCP server?",
+            options: [
+                { value: "local", label: "Local Project (.opencode/opencode.json)", hint: "Configures current working directory for OpenCode" },
+                { value: "global", label: "Global System Agents", hint: "Configures Claude, Cursor, Windsurf, and global OpenCode" },
+                { value: "all", label: "Both Local & Global", hint: "Configures current project and all global system agents" },
+            ],
+        });
+
+        if (p.isCancel(selectedMode)) {
+            p.cancel("Setup cancelled.");
+            process.exit(0);
+        }
+
+        targetMode = selectedMode as "local" | "global" | "all";
+    }
+
+    const s = p.spinner();
+    s.start("Applying configuration...");
+
+    const agents = getAgents(targetMode);
+    let configuredCount = 0;
 
     for (const agent of agents) {
         if (agent.format !== "opencode" && !existsSync(dirname(agent.path))) {
@@ -91,22 +141,20 @@ export function runInit(args: string[] = process.argv.slice(2)): void {
         const config = readJsonObject(agent.path);
 
         if (agent.format === "opencode") {
-            const existingList = Array.isArray(config.mcp) ? (config.mcp as McpEntry[]) : [];
-            const index = existingList.findIndex((item) => item.name === SERVER_NAME);
+            const existingMcp = (config.mcp && typeof config.mcp === "object" && !Array.isArray(config.mcp))
+                ? (config.mcp as Record<string, McpEntry>)
+                : {};
 
-            if (index >= 0 && !force) continue;
+            if (existingMcp[SERVER_NAME] && !force) continue;
 
-            const entry: McpEntry = {
-                name: SERVER_NAME,
-                type: "local",
-                command: ["node", LOCAL_PLUGIN_PATH, "--mcp"],
-                enabled: true,
+            config.mcp = {
+                ...existingMcp,
+                [SERVER_NAME]: {
+                    type: "local",
+                    command: ["node", LOCAL_PLUGIN_PATH, "--mcp"],
+                    enabled: true,
+                },
             };
-
-            if (index >= 0) existingList[index] = entry;
-            else existingList.push(entry);
-
-            config.mcp = existingList;
         } else {
             const existingServers = (config.mcpServers && typeof config.mcpServers === "object" && !Array.isArray(config.mcpServers))
                 ? (config.mcpServers as Record<string, McpEntry>)
@@ -123,13 +171,16 @@ export function runInit(args: string[] = process.argv.slice(2)): void {
             };
         }
 
-        writeJsonObject(agent.path, config);
-        console.log(`✔ Configured ${agent.name} -> ${agent.path}`);
+        writeJsonObject(agent.path, config, agent.format);
+        configuredCount++;
+        p.log.success(`Configured ${agent.name} -> ${agent.path}`);
     }
 
-    console.log("\nSetup complete! Restart your agents to load the tools.");
-}
+    s.stop("Configuration applied!");
 
-if (process.argv.includes("--init") || process.argv.includes("-i")) {
-    runInit();
+    if (configuredCount === 0) {
+        p.note("No files were updated. Configurations already exist (use --force to overwrite).");
+    }
+
+    p.outro("Setup complete! Restart OpenCode or your agents to load the tools.");
 }
