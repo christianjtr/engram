@@ -1,4 +1,4 @@
-import type { GraphLibNode, ReasoningRole } from "../../types";
+import type { GraphLibNode, ReasoningRole, SessionStatus } from "../../types";
 import { NODE_LEVEL_MAP } from "../../types";
 import type { GenericRecord } from "../../utils/helpers";
 import { resolveReasoningRole } from "./reasoning";
@@ -25,12 +25,20 @@ export function createSessionNode(
 ): GraphLibNode | null {
     if (!session.id) return null;
 
+    const endedAt = session.ended_at;
+    const hasSummary = session.summary != null && session.summary !== "";
+    const status: SessionStatus =
+        endedAt == null ? "active"
+        : hasSummary    ? "completed"
+        :                 "interrupted";
+
     return {
         v: getSessionNodeId(session.id as string | number),
         value: {
             category: "SESSION",
             level: NODE_LEVEL_MAP.SESSION,
             reasoning_role: resolveReasoningRole(undefined, "SESSION", mappings),
+            status,
             ...session,
         },
     };
@@ -47,6 +55,9 @@ export function createObservationNode(
     if (!obs.id) return null;
 
     const nodeType = obs.type ? String(obs.type) : undefined;
+    const reviewAfter = obs.review_after;
+    const is_stale =
+        reviewAfter != null && new Date(String(reviewAfter)) < new Date();
 
     return {
         v: getObservationNodeId(obs as { id: unknown; sync_id?: unknown }),
@@ -54,6 +65,7 @@ export function createObservationNode(
             category: "OBSERVATION",
             level: NODE_LEVEL_MAP.OBSERVATION,
             reasoning_role: resolveReasoningRole(nodeType, "OBSERVATION", mappings),
+            is_stale,
             ...obs,
         },
     };

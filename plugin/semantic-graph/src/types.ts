@@ -63,3 +63,68 @@ export interface GraphLibJson {
     nodes: GraphLibNode[];
     edges: GraphLibEdge[];
 }
+
+/**
+ * Status of a session derived from ended_at and summary fields.
+ *   active      — ended_at is absent/null (session still open)
+ *   completed   — ended_at present AND summary present
+ *   interrupted — ended_at present but summary absent/null
+ */
+export type SessionStatus = "active" | "completed" | "interrupted";
+
+/**
+ * Lightweight observation shape used inside the timeline block.
+ * Avoids duplicating the full raw row — only fields useful for orientation.
+ */
+export interface TimelineObservation {
+    id: unknown;
+    sync_id: unknown;
+    type: unknown;
+    title: unknown;
+    scope: unknown;
+    topic_key: unknown;
+    is_stale: boolean;
+    created_at: unknown;
+}
+
+/**
+ * A single session entry in the chronological timeline block.
+ */
+export interface TimelineSession {
+    session_id: string;
+    project: string;
+    status: SessionStatus;
+    started_at: string;
+    ended_at: string | null;
+    observation_count: number;
+    observations: TimelineObservation[];
+}
+
+/**
+ * Pre-computed project summary — allows agents to orient quickly
+ * without processing the full graph payload.
+ */
+export interface ProjectSummary {
+    total_sessions: number;
+    active_sessions: number;
+    completed_sessions: number;
+    interrupted_sessions: number;
+    total_observations: number;
+    stale_observations: number;
+    graph_node_count: number;
+    graph_edge_count: number;
+    last_activity: string | null;
+}
+
+/**
+ * Enriched payload returned by buildKnowledgeGraph.
+ * Three independent blocks — agents can consume only what they need:
+ *   summary  — fast orientation (counts, last activity)
+ *   timeline — chronological session + observation grouping
+ *   graph    — full Graphlib JSON for relational/visual analysis
+ */
+export interface EnrichedGraphPayload {
+    summary: ProjectSummary;
+    timeline: TimelineSession[];
+    graph: GraphLibJson;
+}

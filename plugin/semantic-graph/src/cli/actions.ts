@@ -8,15 +8,15 @@ import { getCurrentProjectName } from "../utils/helpers";
  */
 export async function runGenerateGraphAction(options?: { minify?: boolean; all?: boolean }) {
     const projectName = options?.all ? "all" : getCurrentProjectName();
-    const graph = buildKnowledgeGraph(projectName);
+    const result = buildKnowledgeGraph(projectName);
     const minify = options?.minify ?? true;
 
     const graphPath = getSemanticGraphPath(projectName);
-    saveKnowledgeGraph(graph, graphPath, { minify });
+    saveKnowledgeGraph(result.graph, graphPath, { minify });
 
     return {
-        nodeCount: graph.nodes.length,
-        edgeCount: graph.edges.length
+        nodeCount: result.graph.nodes.length,
+        edgeCount: result.graph.edges.length
     };
 }
 

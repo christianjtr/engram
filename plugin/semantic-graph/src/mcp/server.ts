@@ -24,7 +24,7 @@ server.tool(
             .describe("The target project name (e.g., 'my-project', 'workspace-a', or 'all')."),
     },
     async ({ projectName }) => {
-        const graph = buildKnowledgeGraph(projectName);
+        const result = buildKnowledgeGraph(projectName);
 
         return {
             content: [
@@ -32,9 +32,26 @@ server.tool(
                     type: "text",
                     text: JSON.stringify(
                         {
-                            instructions:
-                                "This payload contains the nodes and edges of the project's knowledge graph. You can process this structure to generate visual representations such as Mermaid diagrams (```mermaid ... ```) or DOT charts if requested.",
-                            graph,
+                            instructions: [
+                                "This payload has three independent blocks — consume only what the task requires:",
+                                "  • summary  — pre-computed counts and last_activity. Use this first for fast orientation.",
+                                "  • timeline — sessions ordered chronologically (oldest first), each with grouped observations.",
+                                "  • graph    — full Graphlib JSON for relational or visual analysis (Mermaid / DOT).",
+                                "",
+                                "Session status rendering:",
+                                "  • status: 'active'      → 🔄  (session still open, no ended_at)",
+                                "  • status: 'completed'   → ✅  (ended_at + summary present)",
+                                "  • status: 'interrupted' → ⚠️  (ended_at present but no summary)",
+                                "",
+                                "Observation staleness:",
+                                "  • is_stale: true → highlight in orange/red in Mermaid or flag in summaries.",
+                                "    (review_after date has passed — observation may need revisiting)",
+                                "",
+                                "If context window is limited, rely on 'summary' only and skip 'graph'.",
+                            ].join("\n"),
+                            summary: result.summary,
+                            timeline: result.timeline,
+                            graph: result.graph,
                         },
                         null,
                         2

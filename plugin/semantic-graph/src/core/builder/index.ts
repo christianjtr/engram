@@ -1,5 +1,14 @@
 import fs from "fs";
-import type { GraphLibJson, GraphLibNode, SemanticGraphConfig } from "../../types";
+import type {
+    GraphLibJson,
+    GraphLibNode,
+    SemanticGraphConfig,
+    EnrichedGraphPayload,
+    ProjectSummary,
+    TimelineSession,
+    TimelineObservation,
+    SessionStatus,
+} from "../../types";
 import { resolveConfig } from "../../config";
 import { DEFAULT_REASONING_MAPPINGS } from "../../config/semantics";
 import { fetchEngramData } from "./fetcher";
@@ -29,16 +38,18 @@ export interface SaveGraphOptions {
 }
 
 /**
- * Builds the knowledge graph in four explicit phases:
- *   1. Filter  — narrow raw data to the target project scope
- *   2. Nodes   — create all node types (real + synthetic)
- *   3. Edges   — run each relationship pipeline independently
+ * Builds the knowledge graph in six explicit phases:
+ *   1. Filter   — narrow raw data to the target project scope
+ *   2. Nodes    — create all node types (real + synthetic)
+ *   3. Edges    — run each relationship pipeline independently
  *   4. Assemble — combine into the final GraphLibJson structure
+ *   5. Timeline — chronological session grouping with observations
+ *   6. Summary  — pre-computed project metrics for fast agent orientation
  */
 export function buildKnowledgeGraph(
     projectName: string | "all",
     config?: SemanticGraphConfig
-): GraphLibJson {
+): EnrichedGraphPayload {
     const activeConfig = resolveConfig(config);
     const mappings = activeConfig.reasoning_mappings ?? DEFAULT_REASONING_MAPPINGS;
     const categoryExclusions = activeConfig.category_exclusions ?? [];
@@ -149,7 +160,7 @@ export function buildKnowledgeGraph(
         ...Array.from(topicNodes.values()),
     ];
 
-    return {
+    const graph: GraphLibJson = {
         options: {
             directed: true,
             multigraph: true,
@@ -158,6 +169,89 @@ export function buildKnowledgeGraph(
         nodes: allNodes,
         edges,
     };
+
+    // -------------------------------------------------------------------------
+    // Phase 5: Build timeline — sessions ordered chronologically with
+    //          their observations grouped underneath
+    // -------------------------------------------------------------------------
+
+    const resolveSessionStatus = (session: Record<string, unknown>): SessionStatus => {
+        const endedAt = session.ended_at;
+        const hasSummary = session.summary != null && session.summary !== "";
+        return endedAt == null ? "active" : hasSummary ? "completed" : "interrupted";
+    };
+
+    const sortedSessions = [...filteredSessions].sort((a, b) => {
+        const aTime = a.started_at ? new Date(String(a.started_at)).getTime() : 0;
+        const bTime = b.started_at ? new Date(String(b.started_at)).getTime() : 0;
+        return aTime - bTime;
+    });
+
+    const now = new Date();
+
+    const timeline: TimelineSession[] = sortedSessions.map((session) => {
+        const sessionId = String(session.id ?? "");
+        const sessionObs = filteredObservations.filter(
+            (obs) => String(obs.session_id) === sessionId
+        );
+
+        const timelineObservations: TimelineObservation[] = sessionObs.map((obs) => {
+            const reviewAfter = obs.review_after;
+            const is_stale = reviewAfter != null && new Date(String(reviewAfter)) < now;
+            return {
+                id: obs.id,
+                sync_id: obs.sync_id,
+                type: obs.type,
+                title: obs.title,
+                scope: obs.scope,
+                topic_key: obs.topic_key ?? null,
+                is_stale,
+                created_at: obs.created_at,
+            };
+        });
+
+        return {
+            session_id: sessionId,
+            project: String(session.project ?? ""),
+            status: resolveSessionStatus(session as Record<string, unknown>),
+            started_at: String(session.started_at ?? ""),
+            ended_at: session.ended_at != null ? String(session.ended_at) : null,
+            observation_count: timelineObservations.length,
+            observations: timelineObservations,
+        };
+    });
+
+    // -------------------------------------------------------------------------
+    // Phase 6: Build summary — pre-computed metrics for fast agent orientation
+    // -------------------------------------------------------------------------
+
+    const activeSessions = timeline.filter((s) => s.status === "active").length;
+    const completedSessions = timeline.filter((s) => s.status === "completed").length;
+    const interruptedSessions = timeline.filter((s) => s.status === "interrupted").length;
+    const totalObservations = filteredObservations.length;
+    const staleObservations = timeline.reduce(
+        (acc, s) => acc + s.observations.filter((o) => o.is_stale).length,
+        0
+    );
+
+    const lastSession = [...timeline]
+        .reverse()
+        .find((s) => s.started_at);
+    const lastActivity = lastSession?.started_at ?? null;
+
+    const summary: ProjectSummary = {
+        total_sessions: timeline.length,
+        active_sessions: activeSessions,
+        completed_sessions: completedSessions,
+        interrupted_sessions: interruptedSessions,
+        total_observations: totalObservations,
+        stale_observations: staleObservations,
+        graph_node_count: allNodes.length,
+        graph_edge_count: edges.length,
+        last_activity: lastActivity,
+    };
+
+    return { summary, timeline, graph };
 }
 
 /**
