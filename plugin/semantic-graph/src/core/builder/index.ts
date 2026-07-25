@@ -229,10 +229,12 @@ export function buildKnowledgeGraph(
     const completedSessions = timeline.filter((s) => s.status === "completed").length;
     const interruptedSessions = timeline.filter((s) => s.status === "interrupted").length;
     const totalObservations = filteredObservations.length;
-    const staleObservations = timeline.reduce(
-        (acc, s) => acc + s.observations.filter((o) => o.is_stale).length,
-        0
-    );
+
+    // Count stale observations from graph nodes to stay consistent with
+    // the graphlib payload (includes observations with no session match).
+    const staleObservations = observationNodes.filter(
+        (n) => n.value.is_stale === true
+    ).length;
 
     const lastSession = [...timeline]
         .reverse()
