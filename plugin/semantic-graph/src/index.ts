@@ -16,14 +16,16 @@ export async function main(): Promise<void> {
     }
 
     if (args.includes("--help") || args.includes("-h")) {
+        const scriptPath = process.argv[1] || "<path-to-plugin>/dist/semantic-graph.js";
+
         console.log(`engram-semantic-graph
 
 Usage:
-  npx engram-semantic-graph              Interactive CLI
-  npx engram-semantic-graph --init       Register MCP in agent configs
-  npx engram-semantic-graph --mcp        Start MCP server (stdio)
-  npx engram-semantic-graph --generate   Build graph for current project
-  npx engram-semantic-graph --generate --all
+  node ${scriptPath}              Interactive CLI
+  node ${scriptPath} --init       Register MCP in agent configs
+  node ${scriptPath} --mcp        Start MCP server (stdio)
+  node ${scriptPath} --generate   Build graph for current project
+  node ${scriptPath} --generate --all
 `);
         return;
     }
