@@ -4,9 +4,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Gentleman-Programming/engram/internal/setup"
-	"github.com/Gentleman-Programming/engram/internal/store"
-	"github.com/Gentleman-Programming/engram/internal/version"
+	"github.com/Gentleman-Programming/engram/v2/internal/setup"
+	"github.com/Gentleman-Programming/engram/v2/internal/store"
+	"github.com/Gentleman-Programming/engram/v2/internal/version"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 func TestTruncateStr(t *testing.T) {
@@ -86,6 +88,12 @@ func TestViewRouterAndErrorRendering(t *testing.T) {
 	}
 	if !strings.Contains(out, "Error: boom") {
 		t.Fatal("error message should be appended to view")
+	}
+}
+
+func TestAppStyleUsesDarkBaseBackground(t *testing.T) {
+	if got := appStyle.GetBackground(); got != colorBase {
+		t.Fatalf("appStyle background = %v, want %v", got, colorBase)
 	}
 }
 
@@ -222,7 +230,7 @@ func TestViewDashboardSearchAndRecent(t *testing.T) {
 
 func TestViewObservationDetailTimelineSessionsAndSessionDetail(t *testing.T) {
 	m := New(nil, "")
-	m.Height = 22
+	m.Height = 40
 
 	out := m.viewObservationDetail()
 	if !strings.Contains(out, "Loading") {
@@ -331,6 +339,32 @@ func TestViewObservationDetailTimelineSessionsAndSessionDetail(t *testing.T) {
 	}
 }
 
+func TestViewSessionsDeletePrompt(t *testing.T) {
+	m := New(nil, "")
+	m.Screen = ScreenSessions
+	m.Sessions = []store.SessionSummary{{ID: "session-1", Project: "engram", StartedAt: "2026-01-01"}}
+	m.SessionDeleteState = SessionDeleteStatePrompt
+	m.SessionDeleteID = "session-1"
+	m.SessionDeleteProject = "engram"
+
+	out := m.viewSessions()
+	if !strings.Contains(out, "Confirm Session Delete") {
+		t.Fatal("delete prompt should render heading")
+	}
+	if !strings.Contains(out, "session-1") || !strings.Contains(out, "engram") {
+		t.Fatal("delete prompt should render selected session context")
+	}
+	if !strings.Contains(out, "[y] Delete") || !strings.Contains(out, "[n] Cancel") || !strings.Contains(out, "[esc] Cancel") {
+		t.Fatal("delete prompt should render y/n/esc options")
+	}
+
+	m.SessionDeleteState = SessionDeleteStateDeleting
+	out = m.viewSessions()
+	if !strings.Contains(out, "Deleting Session") || !strings.Contains(out, "session-1") {
+		t.Fatal("deleting state should render selected session context")
+	}
+}
+
 func TestViewRouterCoversAllScreens(t *testing.T) {
 	m := New(nil, "")
 	m.Stats = &store.Stats{}
@@ -358,6 +392,7 @@ func TestViewRouterCoversAllScreens(t *testing.T) {
 		{screen: ScreenSessions, want: "Sessions"},
 		{screen: ScreenSessionDetail, want: "Session:"},
 		{screen: ScreenSetup, want: "Setup"},
+		{screen: ScreenCloudSettings, want: "Cloud sync settings"},
 	}
 
 	for _, tt := range tests {
@@ -456,4 +491,93 @@ func TestViewSetupAllowlistPrompt(t *testing.T) {
 			t.Fatal("should show error message")
 		}
 	})
+}
+
+func TestObservationDetailScrollStopsAtContentBottom(t *testing.T) {
+	m := New(nil, "")
+	m.Screen = ScreenObservationDetail
+	m.Width = 80
+	m.Height = 24
+	m.SelectedObservation = &store.Observation{
+		ID:        1,
+		Type:      "artifact",
+		Title:     "Long observation",
+		SessionID: "session-1",
+		CreatedAt: "2026-01-01",
+		Content:   strings.Repeat("scrollable line\n", 141),
+	}
+
+	maxScroll := m.observationDetailMaxScroll()
+	if maxScroll == 0 {
+		t.Fatal("long observation should overflow the detail viewport")
+	}
+	for range maxScroll + 10 {
+		updatedModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+		m = updatedModel.(Model)
+	}
+	if m.DetailScroll != maxScroll {
+		t.Fatalf("detail scroll = %d, want maximum %d", m.DetailScroll, maxScroll)
+	}
+
+	updatedModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	m = updatedModel.(Model)
+	if m.DetailScroll != maxScroll-1 {
+		t.Fatalf("first up after bottom = %d, want %d", m.DetailScroll, maxScroll-1)
+	}
+	out := m.View()
+	if got := lipgloss.Height(out); got > m.Height {
+		t.Fatalf("render height = %d, terminal height = %d", got, m.Height)
+	}
+	if !strings.Contains(out, "j/k scroll") {
+		t.Fatal("detail help should remain visible in an 80x24 terminal")
+	}
+
+	m.DetailScroll = 999
+	updatedModel, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = updatedModel.(Model)
+	if m.DetailScroll != m.observationDetailMaxScroll() {
+		t.Fatalf("resized detail scroll = %d, want maximum %d", m.DetailScroll, m.observationDetailMaxScroll())
+	}
+}
+
+func TestObservationDetailScrollsInShortViewport(t *testing.T) {
+	m := New(nil, "")
+	m.Screen = ScreenObservationDetail
+	m.Width = 80
+	m.Height = 16
+	m.SelectedObservation = &store.Observation{
+		ID:        1,
+		Type:      "artifact",
+		Title:     "Long observation",
+		SessionID: "session-1",
+		CreatedAt: "2026-01-01",
+		Content:   strings.Repeat("scrollable line\n", 141),
+	}
+
+	if got := m.observationDetailViewport(); got < 1 {
+		t.Fatalf("short detail viewport = %d, want at least one content line", got)
+	}
+	maxScroll := m.observationDetailMaxScroll()
+	if maxScroll == 0 {
+		t.Fatal("long observation should overflow the short detail viewport")
+	}
+	for range maxScroll + 10 {
+		updatedModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+		m = updatedModel.(Model)
+	}
+	if m.DetailScroll != maxScroll {
+		t.Fatalf("detail scroll = %d, want maximum %d", m.DetailScroll, maxScroll)
+	}
+	updatedModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	m = updatedModel.(Model)
+	if m.DetailScroll != maxScroll-1 {
+		t.Fatalf("first up after bottom = %d, want %d", m.DetailScroll, maxScroll-1)
+	}
+	out := m.View()
+	if got := lipgloss.Height(out); got > m.Height {
+		t.Fatalf("render height = %d, terminal height = %d", got, m.Height)
+	}
+	if !strings.Contains(out, "scrollable line") || !strings.Contains(out, "j/k scroll") {
+		t.Fatal("short detail view should show content and scroll help")
+	}
 }
