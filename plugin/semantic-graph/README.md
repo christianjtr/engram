@@ -1,141 +1,164 @@
 # Engram Semantic Graph
 
-Deterministic semantic knowledge graph plugin for Engram via an **independent MCP server**.
+Deterministic semantic knowledge graph engine and CLI for [Engram](https://github.com/Gentleman-Programming/engram).
 
-Does not modify Engram core. Follows the same local-install + `init` pattern as Pi's `gentle-engram`.
+Connects directly in-memory to the local Engram daemon (`http://127.0.0.1:7437`) using a thin adapter pattern, mirroring the architecture of [`plugin/obsidian`](../obsidian) and [`plugin/pi`](../pi). Does not require recompiling Go and requires zero external MCP configuration.
 
-## Quick start
+---
+
+## Key Features
+
+- **Smart Slicing**: Project-focused by default + inherited global organizational conventions (`GLOBAL_CONTEXT`). Fast, light (<50KB), and token-efficient.
+- **Topological Hierarchy**: Maps memories into a clear graph structure:
+  `GLOBAL_CONTEXT` ➔ `PROJECT` ➔ `TOPIC` ➔ `OBSERVATION`.
+- **Dynamic Type Discovery**: Automatically discovers any custom observation types stored in SQLite and maps them to clean textual badges (e.g. `[CONVENTION]`, `[DECISION]`, `[ARCHITECTURE]`) without emojis or icons.
+- **Obsolescence Awareness**: Distinguishes between active and expired (`stale`) conventions via `review_after` lifecycle tracking.
+- **Semantic Relation Mapping**: Surfaces `SUPERSEDES`, `CONFLICTS_WITH`, and `RELATED_TO` edges from Engram's `memory_relations` judgments.
+- **Interactive CLI**: Menu-driven terminal runner with support for direct CLI flags and automated exports.
+
+---
+
+## Quick Start
+
+### 1. Requirements
+Ensure your Engram server is running locally:
 
 ```bash
-# From your project (local install)
-npm install engram-semantic-graph
+engram serve
+```
 
-# Build if working from this monorepo path
+### 2. Build
+
+```bash
+cd plugin/semantic-graph
+npm install
 npm run build
-
-# Register MCP in detected agent configs (OpenCode, Claude, Cursor, …)
-npx engram-semantic-graph --init
-
-# Restart your agent
 ```
 
-Update an existing registration:
+### 3. Run
 
 ```bash
-npx engram-semantic-graph --init --force
+# Interactive menu
+node dist/semantic-graph.js
+
+# Direct generation (active project + top global rules)
+node dist/semantic-graph.js --generate
+
+# Full store generation (all projects and history)
+node dist/semantic-graph.js --generate --all
+
+# Include expired/stale conventions
+node dist/semantic-graph.js --generate --stale
+
+# Target a specific project
+node dist/semantic-graph.js --generate --project engram
 ```
 
-## What you get
+---
 
-Independent MCP server name: **`engram-semantic-graph`**
+## Output Structure
 
-| Tool | Purpose |
-|------|---------|
-| `get_project_graph` | Enriched knowledge graph for a project (or `all`) — includes `summary`, `timeline`, and full `graph` block for Mermaid / DOT |
-
-## Commands
-
-```bash
-npx engram-semantic-graph              # Interactive CLI
-npx engram-semantic-graph --init       # Register MCP (like pi-engram init)
-npx engram-semantic-graph --mcp        # Stdio MCP server (agents launch this)
-npx engram-semantic-graph --generate   # Build graph for current project
-npx engram-semantic-graph --generate --all
-```
-
-## Manual MCP config
-
-`init` writes an absolute `node …/dist/semantic-graph.js --mcp` entry so agents work from any cwd.
-
-Reference snippets (content to merge into each agent's config file — not standalone files):
-[`mcp-config-templates/`](./mcp-config-templates/).
-
-| Template file | Merge into |
-|---------------|-----------|
-| `claude.json` | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) |
-| `opencode.json` | `~/.config/opencode/opencode.json` or `<project>/.opencode/opencode.json` |
-| `cursor.json` | `~/.cursor/mcp.json` |
-| `windsurf.json` | `~/.codeium/windsurf/mcp_config.json` |
-| `vscode.json` | `~/Library/Application Support/Code/User/mcp.json` (macOS) |
-
-**OpenCode** (`~/.config/opencode/opencode.json`):
+The graph builder produces an enriched JSON structure containing nodes, edges, type catalog, and slice metadata:
 
 ```json
 {
-  "mcp": {
-    "engram-semantic-graph": {
-      "type": "local",
-      "command": ["node", "/path/to/node_modules/engram-semantic-graph/dist/semantic-graph.js", "--mcp"],
-      "enabled": true
+  "nodes": [
+    {
+      "id": "global:context",
+      "category": "GLOBAL_CONTEXT",
+      "label": "GLOBAL CONTEXT"
+    },
+    {
+      "id": "project:engram",
+      "category": "PROJECT",
+      "label": "PROJECT: engram"
+    },
+    {
+      "id": "topic:architecture/plugins",
+      "category": "TOPIC",
+      "label": "TOPIC: architecture/plugins"
+    },
+    {
+      "id": "obs:42",
+      "category": "OBSERVATION",
+      "label": "Thin Adapters in TS",
+      "type": "architecture",
+      "lifecycle": "active",
+      "topic_key": "architecture/plugins",
+      "content": "Adapters in plugin/ must remain thin..."
     }
+  ],
+  "edges": [
+    {
+      "source": "project:engram",
+      "target": "global:context",
+      "relation": "INHERITS"
+    },
+    {
+      "source": "topic:architecture/plugins",
+      "target": "project:engram",
+      "relation": "BELONGS_TO"
+    },
+    {
+      "source": "obs:42",
+      "target": "topic:architecture/plugins",
+      "relation": "BELONGS_TO"
+    }
+  ],
+  "types": {
+    "convention": { "type": "convention", "label": "CONVENTION", "color": "#10b981", "isConventionLike": true },
+    "decision": { "type": "decision", "label": "DECISION", "color": "#3b82f6", "isConventionLike": true }
+  },
+  "slice": {
+    "project": "engram",
+    "totalObservations": 24,
+    "activeCount": 22,
+    "staleCount": 2,
+    "globalRulesInherited": 10,
+    "globalRulesTotal": 38,
+    "topicsCount": 5,
+    "isExhaustive": false,
+    "generatedAt": "2026-09-17T17:00:00.000Z"
   }
 }
 ```
 
-**Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
-
-```json
-{
-  "mcpServers": {
-    "engram-semantic-graph": {
-      "command": "node",
-      "args": ["/path/to/node_modules/engram-semantic-graph/dist/semantic-graph.js", "--mcp"]
-    }
-  }
-}
-```
-
-**Cursor** (`~/.cursor/mcp.json`) and **Windsurf** (`~/.codeium/windsurf/mcp_config.json`) use the same `mcpServers` format above.
-
-**VS Code** (`~/Library/Application Support/Code/User/mcp.json`) — uses `servers` key and requires `type: "stdio"`:
-
-```json
-{
-  "servers": {
-    "engram-semantic-graph": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["/path/to/node_modules/engram-semantic-graph/dist/semantic-graph.js", "--mcp"]
-    }
-  }
-}
-```
-
-**Claude Code CLI** — does not use a JSON config file. Register manually:
-
-```bash
-claude mcp add engram-semantic-graph node /path/to/dist/semantic-graph.js --mcp
-```
-
-## Supported agents
-
-### Auto-configured via `--init`
-
-| Agent | Config written |
-|-------|---------------|
-| OpenCode (local project) | `<cwd>/.opencode/opencode.json` |
-| OpenCode (global) | `~/.config/opencode/opencode.json` |
-| Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` |
-| Cursor | `~/.cursor/mcp.json` |
-| Windsurf | `~/.codeium/windsurf/mcp_config.json` |
-| VS Code | `~/Library/Application Support/Code/User/mcp.json` |
-
-Agents whose config directory does not exist are skipped with a warning.
-
-### Manual config only
-
-- **Claude Code CLI**: `claude mcp add engram-semantic-graph node /path/to/dist/semantic-graph.js --mcp`
-- **Gemini CLI, Kiro, Kilo Code, Antigravity, Qwen**: see [`mcp-config-templates/`](./mcp-config-templates/) for reference snippets.
+---
 
 ## Architecture
 
-Thin adapter pattern (Engram plugin rules):
+Follows Engram's thin adapter rules:
 
-- `src/mcp/server.ts` — MCP stdio surface only
-- `src/core/builder/` — graph fetch / reason / build
-- `src/cli/` — interactive menu + `init` registration
+```
+src/
+├── types.ts              # 1:1 schema alignment with Engram Go models & graph types
+├── core/
+│   ├── client.ts         # In-memory HTTP client (:7437 /export, /observations, /conflicts)
+│   ├── derivations.ts    # Pure lifecycle, status, normalization & type registry helpers
+│   ├── builder.ts        # Graph assembly & smart slicing engine
+│   └── index.ts          # Core barrel exports
+├── cli/
+│   ├── actions.ts        # Graph generation & status actions
+│   └── runner.ts         # Interactive terminal UI using @clack/prompts
+└── index.ts              # CLI entry point
+```
 
-Independent of core `engram mcp` (`mem_*` tools). Run both side by side.
+---
+
+## Testing & Quality
+
+```bash
+# Run unit test suite (18 tests covering derivations, builder, and slicing)
+npm test
+
+# Type check
+npm run typecheck
+
+# Production build
+npm run build
+```
+
+---
 
 ## License
 
