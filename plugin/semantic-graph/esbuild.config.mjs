@@ -15,7 +15,6 @@ const context = await esbuild.context({
     target: "node20",
     format: "cjs",
     external: [
-        "@modelcontextprotocol/sdk",
         ...builtins
     ],
     define: {

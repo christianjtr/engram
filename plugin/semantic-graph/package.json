@@ -1,7 +1,7 @@
 {
   "name": "engram-semantic-graph",
   "version": "1.0.0",
-  "description": "Deterministic semantic knowledge graph plugin for Engram via MCP",
+  "description": "Deterministic semantic knowledge graph engine and CLI for Engram",
   "main": "dist/semantic-graph.js",
   "bin": {
     "engram-semantic-graph": "dist/semantic-graph.js"
@@ -9,7 +9,6 @@
   "private": true,
   "files": [
     "dist",
-    "mcp-config-templates",
     "README.md"
   ],
   "scripts": {
@@ -19,15 +18,14 @@
     "dev": "node esbuild.config.mjs --watch",
     "start": "node dist/semantic-graph.js",
     "generate": "node dist/semantic-graph.js --generate",
-    "mcp": "node dist/semantic-graph.js --mcp",
-    "init": "node dist/semantic-graph.js --init",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "npx tsx --test 'tests/**/*.test.ts'"
   },
   "keywords": [
     "engram",
     "memory",
     "ai",
-    "mcp-server",
+    "cli",
     "knowledge-graph",
     "semantic-graph"
   ],
@@ -35,7 +33,6 @@
   "license": "MIT",
   "dependencies": {
     "@clack/prompts": "^1.7.0",
-    "@modelcontextprotocol/sdk": "^1.4.0",
     "graphlib": "^2.1.8"
   },
   "devDependencies": {
@@ -44,6 +41,7 @@
     "builtin-modules": "^5.3.0",
     "esbuild": "^0.21.0",
     "lockfile-lint": "^4.14.1",
+    "tsx": "^4.19.0",
     "typescript": "^5.0.0"
   }
 }
