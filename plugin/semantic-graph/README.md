@@ -6,6 +6,16 @@ Connects directly in-memory to the local Engram daemon (`http://127.0.0.1:7437`)
 
 ---
 
+## Core Benefits
+
+- **Relational Context vs. Isolated Search**: Vector search or raw keyword queries return disconnected fragments without provenance. The semantic graph organizes memories into a coherent topological map linking projects, domain topics, architectural decisions, and organizational conventions.
+- **Hierarchical Context Inheritance**: Global and personal rules (`scope: global | personal`) automatically flow down into project workspaces without manual duplication or config drifts.
+- **Conflict & Obsolescence Guardrails**: Detects expired conventions (`review_after`) and explicitly tracks superseding or conflicting relationships, preventing developers and AI agents from relying on outdated guidance.
+- **Ultra-Fast & In-Memory (<30ms)**: Eliminates disk writes, shell spawns (`execSync`), and temporary files by pulling directly from Engram's HTTP server in memory.
+- **Zero Go Compilation & Zero Setup**: Pure TypeScript thin adapter that requires zero binary recompilation and zero external daemon/JSON configurations.
+
+---
+
 ## Key Features
 
 - **Smart Slicing**: Project-focused by default + inherited global organizational conventions (`GLOBAL_CONTEXT`). Fast, light (<50KB), and token-efficient.
@@ -142,6 +152,20 @@ src/
 │   └── runner.ts         # Interactive terminal UI using @clack/prompts
 └── index.ts              # CLI entry point
 ```
+
+---
+
+## Roadmap & Work In Progress (WIP)
+
+We are actively developing the presentation and consumption layer across two primary flanks:
+
+### 1. Interactive Visual Experience (CodeViz / Graphify style)
+- **Standalone Interactive HTML Visualizer**: A local browser-based interactive canvas (zoom, pan, search, physics layout, cluster filtering) to inspect project conventions and architectural decisions visually.
+- **Direct Mermaid Exporters**: Output formatted Mermaid (`flowchart TD`) diagrams with styled subgraphs and deterministic theme classes for Markdown files and IDE previews.
+
+### 2. Efficient Agent Context Consumption
+- **Pruned Agent Context Format (`--format=agent-context`)**: A token-optimized Markdown payload prioritizing active conventions and decisions for LLM decision-making (~300 tokens), omitting historical noise.
+- **Accompanying Agent Skill (`skills/semantic-graph`)**: An official Engram agent skill defining the reasoning protocol for AI coding agents to inspect the semantic graph before proposing changes or writing code.
 
 ---
 
