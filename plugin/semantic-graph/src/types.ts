@@ -1,130 +1,166 @@
 /**
- * Cognitive reasoning roles assigned to graph nodes for AI agents.
+ * Core type definitions for Engram Semantic Graph.
+ * All models align 1:1 with Engram native Go types (internal/store/store.go & relations.go).
+ * Output and labels are strictly in English. No icons or emojis are used for types.
  */
-export type ReasoningRole = "CONSTRAINT" | "FACT" | "HISTORICAL_RECORD";
 
-/**
- * Hierarchical levels for structural data mapping in the graph.
- *   0 — Project scope   (PROJECT nodes, including the synthetic GLOBAL_CONTEXT root)
- *   1 — Session scope   (SESSION nodes)
- *   2 — Observation scope (OBSERVATION nodes, including synthetic TOPIC_CLUSTER nodes)
- *
- * Synthetic nodes reuse existing levels and are differentiated by the `type` field:
- *   - GLOBAL_CONTEXT root: category="PROJECT", type="global_context", is_synthetic=true
- *   - Topic cluster:       category="OBSERVATION", type="topic_cluster", is_synthetic=true
- */
-export type NodeLevel = 0 | 1 | 2;
+// ─── Native Engram Entities ──────────────────────────────────────────────────
 
-export const NODE_LEVEL_MAP = {
-    PROJECT: 0 as NodeLevel,
-    SESSION: 1 as NodeLevel,
-    OBSERVATION: 2 as NodeLevel,
-} as const;
-
-/**
- * Mappings for categorizing node types into cognitive reasoning roles.
- */
-export interface ReasoningRoleMappings {
-    constraint_types?: string[];
-    history_types?: string[];
+export interface EngramObservation {
+    id: number;
+    sync_id: string;
+    session_id: string;
+    type: string;
+    title: string;
+    content: string;
+    tool_name?: string | null;
+    project?: string | null;
+    scope: "project" | "global" | "personal";
+    topic_key?: string | null;
+    revision_count: number;
+    duplicate_count?: number;
+    last_seen_at?: string | null;
+    review_after?: string | null;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string | null;
 }
 
-/**
- * Simplified configuration interface for the semantic graph generator.
- */
-export interface SemanticGraphConfig {
-    category_exclusions?: string[];
-    reasoning_mappings?: ReasoningRoleMappings;
+export interface EngramSession {
+    id: string;
+    project: string;
+    ownership_mode?: string;
+    directory: string;
+    started_at: string;
+    ended_at?: string | null;
+    summary?: string | null;
 }
 
-/**
- * Native Graphlib JSON export schema structure.
- */
-export interface GraphLibJsonOptions {
-    directed: boolean;
-    multigraph: boolean;
-    compound: boolean;
+export interface EngramRelation {
+    sync_id: string;
+    source_id: string;
+    target_id: string;
+    relation: "supersedes" | "conflicts_with" | "related" | "compatible" | "scoped" | "not_conflict" | string;
+    reason?: string;
+    evidence?: string;
+    confidence?: number;
+    judgment_status: "pending" | "judged" | "orphaned" | "ignored" | string;
 }
 
-export interface GraphLibNode {
-    v: string;
-    value: Record<string, unknown>;
+export interface EngramExportPayload {
+    version: string;
+    exported_at: string;
+    sessions: EngramSession[];
+    observations: EngramObservation[];
+    prompts?: Array<{
+        id: number;
+        sync_id: string;
+        session_id: string;
+        content: string;
+        project?: string;
+        created_at: string;
+    }>;
 }
 
-export interface GraphLibEdge {
-    v: string;
-    w: string;
-    name?: string;
-    value: Record<string, unknown>;
-}
+// ─── Observation Lifecycle & Session Status ──────────────────────────────────
 
-export interface GraphLibJson {
-    options: GraphLibJsonOptions;
-    nodes: GraphLibNode[];
-    edges: GraphLibEdge[];
-}
-
-/**
- * Status of a session derived from ended_at and summary fields.
- *   active      — ended_at is absent/null (session still open)
- *   completed   — ended_at present AND summary present
- *   interrupted — ended_at present but summary absent/null
- */
+export type ObservationLifecycle = "active" | "stale";
 export type SessionStatus = "active" | "completed" | "interrupted";
 
-/**
- * Lightweight observation shape used inside the timeline block.
- * Avoids duplicating the full raw row — only fields useful for orientation.
- */
-export interface TimelineObservation {
-    id: unknown;
-    sync_id: unknown;
-    type: unknown;
-    title: unknown;
-    scope: unknown;
-    topic_key: unknown;
-    is_stale: boolean;
-    created_at: unknown;
-}
+// ─── Extensible Observation Types ────────────────────────────────────────────
+
+export const STANDARD_OBSERVATION_TYPES = [
+    "convention",
+    "decision",
+    "architecture",
+    "pattern",
+    "config",
+    "bugfix",
+    "discovery",
+    "learning",
+] as const;
+
+export type StandardObservationType = (typeof STANDARD_OBSERVATION_TYPES)[number];
 
 /**
- * A single session entry in the chronological timeline block.
+ * Open union allowing standard autocomplete while safely accepting any custom DB type string.
  */
-export interface TimelineSession {
-    session_id: string;
+export type ObservationType = StandardObservationType | (string & {});
+
+export interface TypeMetadata {
+    type: string;
+    label: string;             // Clean uppercase textual badge (e.g. "CONVENTION", "DECISION")
+    color: string;             // Color hex code for visual renderers
+    isConventionLike: boolean; // Indicates rules, constraints, and architecture decisions
+}
+
+// ─── Semantic Graph Structures ───────────────────────────────────────────────
+
+export type GraphNodeCategory =
+    | "GLOBAL_CONTEXT"
+    | "PROJECT"
+    | "TOPIC"
+    | "OBSERVATION"
+    | "SESSION";
+
+export interface GraphNode {
+    id: string;
+    category: GraphNodeCategory;
+    label: string;
+    lifecycle?: ObservationLifecycle;
+    status?: SessionStatus;
+    type?: string;
+    scope?: string;
+    topic_key?: string;
+    content?: string;
+    metadata?: Record<string, unknown>;
+}
+
+export type GraphEdgeRelation =
+    | "INHERITS"
+    | "BELONGS_TO"
+    | "SUPERSEDES"
+    | "CONFLICTS_WITH"
+    | "RELATED_TO"
+    | "PRODUCED_IN";
+
+export interface GraphEdge {
+    source: string;
+    target: string;
+    relation: GraphEdgeRelation;
+    reason?: string;
+    metadata?: Record<string, unknown>;
+}
+
+export interface SliceMetadata {
     project: string;
-    status: SessionStatus;
-    started_at: string;
-    ended_at: string | null;
-    observation_count: number;
-    observations: TimelineObservation[];
+    totalObservations: number;
+    activeCount: number;
+    staleCount: number;
+    globalRulesInherited: number;
+    globalRulesTotal: number;
+    topicsCount: number;
+    isExhaustive: boolean;
+    generatedAt: string;
 }
 
-/**
- * Pre-computed project summary — allows agents to orient quickly
- * without processing the full graph payload.
- */
-export interface ProjectSummary {
-    total_sessions: number;
-    active_sessions: number;
-    completed_sessions: number;
-    interrupted_sessions: number;
-    total_observations: number;
-    stale_observations: number;
-    graph_node_count: number;
-    graph_edge_count: number;
-    last_activity: string | null;
+export interface SemanticGraph {
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+    types: Record<string, TypeMetadata>;
+    slice: SliceMetadata;
 }
 
-/**
- * Enriched payload returned by buildKnowledgeGraph.
- * Three independent blocks — agents can consume only what they need:
- *   summary  — fast orientation (counts, last activity)
- *   timeline — chronological session + observation grouping
- *   graph    — full Graphlib JSON for relational/visual analysis
- */
-export interface EnrichedGraphPayload {
-    summary: ProjectSummary;
-    timeline: TimelineSession[];
-    graph: GraphLibJson;
+export interface GraphBuildOptions {
+    project?: string;
+    globalLimit?: number | "all";
+    includeStale?: boolean;
+    includeSessions?: boolean;
+    topicFilter?: string;
+    typeFilter?: string[];
+    isExhaustive?: boolean;
+}
+
+export interface SemanticGraphConfig {
+    category_exclusions?: string[];
 }
