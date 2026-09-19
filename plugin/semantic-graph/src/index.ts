@@ -9,22 +9,31 @@ export async function main(): Promise<void> {
     const args = process.argv.slice(2);
 
     if (args.includes("--help") || args.includes("-h")) {
-        const scriptPath = process.argv[1] || "<path-to-plugin>/dist/semantic-graph.js";
-
-        console.log(`engram-semantic-graph
+        console.log(`engram-semantic-graph v${__PLUGIN_VERSION__} — Deterministic semantic knowledge graph for Engram
 
 Usage:
-  node ${scriptPath}           Interactive menu
-  node ${scriptPath} -g        Generate (current project, minified)
-  node ${scriptPath} -g -a     All projects
-  node ${scriptPath} -g -p <name>
-  node ${scriptPath} -g -s     Include stale
-  node ${scriptPath} -g -m     Force minified (default)
+  engram-semantic-graph           Interactive menu
+  engram-semantic-graph -g        Generate graph (current project)
+  engram-semantic-graph -a        All projects
+  engram-semantic-graph -p <name> Specific project
+  engram-semantic-graph -s        Include stale observations
+
+Example:
+  engram-semantic-graph -p myproject -s
+  # or
+  npx engram-semantic-graph -p myproject -s
 `);
+
         return;
     }
 
-    if (args.includes("--generate") || args.includes("-g")) {
+    const wantsGenerate =
+        args.includes("-g") || args.includes("--generate") ||
+        args.includes("-a") || args.includes("--all") ||
+        args.includes("-p") || args.includes("--project") ||
+        args.includes("-s") || args.includes("--stale");
+
+    if (wantsGenerate) {
         const generateAll = args.includes("--all") || args.includes("-a");
         const includeStale = args.includes("--stale");
         const projectIdx = args.indexOf("--project");
