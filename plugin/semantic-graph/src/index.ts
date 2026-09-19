@@ -11,14 +11,15 @@ export async function main(): Promise<void> {
     if (args.includes("--help") || args.includes("-h")) {
         const scriptPath = process.argv[1] || "<path-to-plugin>/dist/semantic-graph.js";
 
-        console.log(`engram-semantic-graph - Deterministic Knowledge Graph Engine
+        console.log(`engram-semantic-graph
 
 Usage:
-  node ${scriptPath}              Interactive CLI menu
-  node ${scriptPath} --generate   Build graph for current project
-  node ${scriptPath} --generate --all
-  node ${scriptPath} --project <name>
-  node ${scriptPath} --stale      Include expired/stale conventions
+  node ${scriptPath}           Interactive menu
+  node ${scriptPath} -g        Generate (current project, minified)
+  node ${scriptPath} -g -a     All projects
+  node ${scriptPath} -g -p <name>
+  node ${scriptPath} -g -s     Include stale
+  node ${scriptPath} -g -m     Force minified (default)
 `);
         return;
     }
@@ -28,18 +29,17 @@ Usage:
         const includeStale = args.includes("--stale");
         const projectIdx = args.indexOf("--project");
         const project = projectIdx !== -1 && args[projectIdx + 1] ? args[projectIdx + 1] : undefined;
+        const minify = true;
 
-        console.log(
-            `Generating semantic graph (${generateAll ? "all projects" : project || "current project"})...`
-        );
+        console.log(`Generating graph...`);
         const stats = await runGenerateGraphAction({
-            minify: true,
+            minify,
             all: generateAll,
             project,
             includeStale,
         });
-        console.log(`Graph generated successfully! (${stats.nodeCount} nodes, ${stats.edgeCount} edges)`);
-        console.log(`Saved to: ${stats.graphPath}`);
+        console.log(`Graph saved (${stats.nodeCount} nodes, ${stats.edgeCount} edges)`);
+        console.log(`File: ${stats.graphPath}`);
         return;
     }
 

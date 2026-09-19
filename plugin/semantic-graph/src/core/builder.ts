@@ -21,6 +21,8 @@ export interface BuildGraphInput {
     projectName: string;
     observations: EngramObservation[];
     globalObservations?: EngramObservation[];
+    /** Source sessions for inherited provenance only; not rendered as session nodes. */
+    globalSessions?: EngramSession[];
     sessions?: EngramSession[];
     relations?: EngramRelation[];
     options?: GraphBuildOptions;
@@ -33,12 +35,21 @@ export interface BuildGraphInput {
 export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
     const {
         projectName,
-        observations = [],
-        globalObservations = [],
+        observations: inputObservations = [],
+        globalObservations: inputGlobalObservations = [],
+        globalSessions = [],
         sessions = [],
         relations = [],
         options = {},
     } = input;
+
+    const referenceDate = new Date();
+    const observations = inputObservations.filter((obs) => obs.deleted_at == null);
+    const globalObservations = inputGlobalObservations.filter((obs) => obs.deleted_at == null);
+    const fallbackProject = options.all ? "unknown-project" : projectName;
+    const sessionProjects = new Map([...globalSessions, ...sessions].map((sess) => [sess.id, sess.project]));
+    const observationProject = (obs: EngramObservation, fallback = fallbackProject): string =>
+        obs.project || sessionProjects.get(obs.session_id) || fallback;
 
     const globalLimit = options.globalLimit ?? 15;
     const includeStale = options.includeStale ?? false;
@@ -51,7 +62,6 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
 
     // ── 1. Root Context Nodes ────────────────────────────────────────────────
     const globalContextId = "global:context";
-    const projectRootId = `project:${projectName}`;
 
     nodesMap.set(globalContextId, {
         id: globalContextId,
@@ -60,23 +70,30 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
         metadata: { scope: "global" },
     });
 
-    nodesMap.set(projectRootId, {
-        id: projectRootId,
-        category: "PROJECT",
-        label: `PROJECT: ${projectName}`,
-        metadata: { project: projectName },
-    });
+    function ensureProjectRoot(project: string): string {
+        const id = `project:${project}`;
+        if (!nodesMap.has(id)) {
+            nodesMap.set(id, {
+                id,
+                category: "PROJECT",
+                label: `PROJECT: ${project}`,
+                metadata: { project },
+            });
+            edges.push({
+                source: id,
+                target: globalContextId,
+                relation: "INHERITS",
+                reason: "Inherited global conventions and organizational rules",
+            });
+        }
+        return id;
+    }
 
-    edges.push({
-        source: projectRootId,
-        target: globalContextId,
-        relation: "INHERITS",
-        reason: "Inherited global conventions and organizational rules",
-    });
+    if (!options.all) ensureProjectRoot(projectName);
 
     // ── 2. Global Inherited Observations ─────────────────────────────────────
     const candidateGlobals = globalObservations.filter((obs) => {
-        if (!includeStale && calculateObservationLifecycle(obs.review_after) === "stale") {
+        if (!includeStale && calculateObservationLifecycle(obs.review_after, referenceDate) === "stale") {
             return false;
         }
         if (typeFilter && typeFilter.length > 0) {
@@ -95,7 +112,7 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
 
     for (const obs of slicedGlobals) {
         const obsNodeId = `obs:global:${obs.id}`;
-        const lifecycle = calculateObservationLifecycle(obs.review_after);
+        const lifecycle = calculateObservationLifecycle(obs.review_after, referenceDate);
         const normalizedType = normalizeObservationType(obs.type);
 
         nodesMap.set(obsNodeId, {
@@ -104,10 +121,11 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
             label: obs.title,
             lifecycle,
             type: normalizedType,
-            scope: "global",
+            scope: obs.scope,
             topic_key: obs.topic_key ?? undefined,
             content: obs.content,
             metadata: {
+                project: observationProject(obs, "unknown-project"),
                 sync_id: obs.sync_id,
                 created_at: obs.created_at,
                 updated_at: obs.updated_at,
@@ -138,7 +156,7 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
     const includedProjectObservations: EngramObservation[] = [];
 
     for (const obs of observations) {
-        const lifecycle = calculateObservationLifecycle(obs.review_after);
+        const lifecycle = calculateObservationLifecycle(obs.review_after, referenceDate);
         if (lifecycle === "active") activeCount++;
         if (lifecycle === "stale") staleCount++;
 
@@ -160,14 +178,18 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
         includedProjectObservations.push(obs);
 
         // Ensure topic node exists
-        const topicNodeId = `topic:${rawTopic}`;
+        const project = observationProject(obs);
+        const topicProject = options.all ? project : projectName;
+        const projectRootId = ensureProjectRoot(topicProject);
+        // Tuple encoding avoids delimiter collisions; single-project IDs remain stable.
+        const topicNodeId = options.all ? `topic:${JSON.stringify([project, rawTopic])}` : `topic:${rawTopic}`;
         if (!topicNodesCreated.has(topicNodeId)) {
             topicNodesCreated.add(topicNodeId);
             nodesMap.set(topicNodeId, {
                 id: topicNodeId,
                 category: "TOPIC",
                 label: `TOPIC: ${rawTopic}`,
-                metadata: { topic: rawTopic },
+                metadata: { topic: rawTopic, project: topicProject },
             });
 
             edges.push({
@@ -194,6 +216,7 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
             topic_key: rawTopic,
             content: obs.content,
             metadata: {
+                project,
                 sync_id: obs.sync_id,
                 session_id: obs.session_id,
                 created_at: obs.created_at,
@@ -214,6 +237,8 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
         for (const sess of sessions) {
             const sessNodeId = `session:${sess.id}`;
             const status = calculateSessionStatus(sess);
+            const project = sess.project || fallbackProject;
+            const projectRootId = ensureProjectRoot(project);
 
             nodesMap.set(sessNodeId, {
                 id: sessNodeId,
@@ -221,6 +246,7 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
                 label: `Session ${sess.id.slice(0, 8)}`,
                 status,
                 metadata: {
+                    project,
                     started_at: sess.started_at,
                     ended_at: sess.ended_at,
                     summary: sess.summary,
@@ -254,6 +280,8 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
 
     // ── 5. Explicit Semantic Relations ───────────────────────────────────────
     for (const rel of relations) {
+        if (rel.judgment_status !== "judged") continue;
+
         const sourceNodeId = obsSyncIdToNodeId.get(rel.source_id);
         const targetNodeId = obsSyncIdToNodeId.get(rel.target_id);
 
@@ -275,6 +303,7 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
             relation: edgeRel,
             reason: rel.reason || `Judged relation: ${rel.relation}`,
             metadata: {
+                relation: rel.relation,
                 judgment_status: rel.judgment_status,
                 sync_id: rel.sync_id,
             },
@@ -294,7 +323,7 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
         globalRulesTotal: globalObservations.length,
         topicsCount: topicNodesCreated.size,
         isExhaustive: Boolean(options.isExhaustive),
-        generatedAt: new Date().toISOString(),
+        generatedAt: referenceDate.toISOString(),
     };
 
     return {

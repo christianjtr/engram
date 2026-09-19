@@ -72,12 +72,16 @@ export function calculateObservationLifecycle(
         return "active";
     }
 
-    const reviewDate = new Date(reviewAfter.trim());
+    const timestamp = reviewAfter.trim();
+    // SQLite's native timestamps are UTC despite lacking an explicit zone.
+    const reviewDate = new Date(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(timestamp)
+        ? `${timestamp.replace(" ", "T")}Z`
+        : timestamp);
     if (isNaN(reviewDate.getTime())) {
         return "active";
     }
 
-    return reviewDate < referenceDate ? "stale" : "active";
+    return reviewDate <= referenceDate ? "stale" : "active";
 }
 
 /**
@@ -155,7 +159,7 @@ function hslToHex(h: number, s: number, l: number): string {
 export function buildDynamicTypeRegistry(
     observations: Array<{ type?: string | null }>
 ): Record<string, TypeMetadata> {
-    const registry: Record<string, TypeMetadata> = {};
+    const registry: Record<string, TypeMetadata> = Object.create(null);
 
     // Populate defaults
     for (const [key, meta] of Object.entries(DEFAULT_TYPE_METADATA)) {

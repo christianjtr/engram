@@ -1,6 +1,6 @@
 /**
  * Core type definitions for Engram Semantic Graph.
- * All models align 1:1 with Engram native Go types (internal/store/store.go & relations.go).
+ * Models describe the consumed fields of Engram's Go HTTP payloads, not full store rows.
  * Output and labels are strictly in English. No icons or emojis are used for types.
  */
 
@@ -41,6 +41,7 @@ export interface EngramRelation {
     source_id: string;
     target_id: string;
     relation: "supersedes" | "conflicts_with" | "related" | "compatible" | "scoped" | "not_conflict" | string;
+    // The HTTP list omits these judgment details; direct builder callers may supply them.
     reason?: string;
     evidence?: string;
     confidence?: number;
@@ -153,6 +154,7 @@ export interface SemanticGraph {
 
 export interface GraphBuildOptions {
     project?: string;
+    all?: boolean;
     globalLimit?: number | "all";
     includeStale?: boolean;
     includeSessions?: boolean;

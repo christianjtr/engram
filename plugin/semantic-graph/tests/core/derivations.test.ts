@@ -6,7 +6,6 @@ import {
     normalizeTopicKey,
     normalizeObservationType,
     buildDynamicTypeRegistry,
-    DEFAULT_TYPE_METADATA,
 } from "../../src/core/derivations.ts";
 
 describe("Derivations", () => {
@@ -30,6 +29,38 @@ describe("Derivations", () => {
 
         it("returns active when review_after is malformed", () => {
             assert.equal(calculateObservationLifecycle("not-a-date"), "active");
+        });
+
+        it("marks the exact review deadline stale", () => {
+            const now = new Date("2026-09-19T12:00:00.123Z");
+            assert.equal(calculateObservationLifecycle(now.toISOString(), now), "stale");
+            assert.equal(calculateObservationLifecycle("2026-09-19T12:00:00.124Z", now), "active");
+        });
+
+        it("parses native timestamps as UTC regardless of the host timezone", () => {
+            const previousTZ = process.env.TZ;
+            try {
+                process.env.TZ = "America/Los_Angeles";
+                const now = new Date("2026-09-19T12:00:00.124Z");
+                for (const deadline of [
+                    "2026-09-19 12:00:00",
+                    " 2026-09-19 12:00:00.123 ",
+                    "2026-09-19 12:00:00.123456",
+                ]) {
+                    assert.equal(calculateObservationLifecycle(deadline, now), "stale", deadline);
+                }
+                assert.equal(calculateObservationLifecycle("2026-09-19 12:00:00.125", now), "active");
+            } finally {
+                if (previousTZ === undefined) delete process.env.TZ;
+                else process.env.TZ = previousTZ;
+            }
+        });
+
+        it("preserves explicitly zoned ISO timestamp semantics", () => {
+            const now = new Date("2026-09-19T12:00:00Z");
+            assert.equal(calculateObservationLifecycle("2026-09-19T13:00:00+02:00", now), "stale");
+            assert.equal(calculateObservationLifecycle("2026-09-19T11:00:00-02:00", now), "active");
+            assert.equal(calculateObservationLifecycle("2026-09-19T12:00:01Z", now), "active");
         });
     });
 
@@ -112,6 +143,22 @@ describe("Derivations", () => {
 
             assert.ok(registry.custom_rule);
             assert.equal(registry.custom_rule.label, "CUSTOM_RULE");
+        });
+
+        it("registers prototype-named custom types as serializable own properties", () => {
+            const types = ["__proto__", "constructor", "toString", "hasOwnProperty"];
+            const registry = buildDynamicTypeRegistry(types.map((type) => ({ type })));
+            assert.equal(Object.getPrototypeOf(registry), null);
+            const serialized = JSON.parse(JSON.stringify(registry));
+            for (const rawType of types) {
+                const type = rawType.toLowerCase();
+                assert.ok(Object.hasOwn(registry, type));
+                assert.equal(registry[type].type, type);
+                assert.equal(registry[type].label, type.toUpperCase());
+                assert.equal(registry[type].isConventionLike, false);
+                assert.match(registry[type].color, /^#[0-9a-f]{6}$/);
+                assert.deepEqual(serialized[type], registry[type]);
+            }
         });
     });
 });
