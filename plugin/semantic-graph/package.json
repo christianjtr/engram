@@ -19,7 +19,7 @@
     "start": "node dist/semantic-graph.js",
     "generate": "node dist/semantic-graph.js --generate",
     "typecheck": "tsc --noEmit",
-    "test": "npx tsx --test 'tests/**/*.test.ts'"
+    "test": "tsx --test tests/**/*.test.ts"
   },
   "keywords": [
     "engram",
