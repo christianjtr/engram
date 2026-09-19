@@ -2,28 +2,28 @@
 
 Deterministic semantic knowledge graph engine and CLI for [Engram](https://github.com/Gentleman-Programming/engram).
 
-Connects directly in-memory to the local Engram daemon (`http://127.0.0.1:7437`) using a thin adapter pattern, mirroring the architecture of [`plugin/obsidian`](../obsidian) and [`plugin/pi`](../pi). Does not require recompiling Go and requires zero external MCP configuration.
+Reads from the local Engram HTTP server (`http://127.0.0.1:7437`) and assembles a derived graph in TypeScript. It does not access SQLite directly, mutate memories, or require recompiling Go. This is a standalone CLI, not an MCP server.
 
 ---
 
 ## Core Benefits
 
 - **Relational Context vs. Isolated Search**: Vector search or raw keyword queries return disconnected fragments without provenance. The semantic graph organizes memories into a coherent topological map linking projects, domain topics, architectural decisions, and organizational conventions.
-- **Hierarchical Context Inheritance**: Global and personal rules (`scope: global | personal`) automatically flow down into project workspaces without manual duplication or config drifts.
-- **Conflict & Obsolescence Guardrails**: Detects expired conventions (`review_after`) and explicitly tracks superseding or conflicting relationships, preventing developers and AI agents from relying on outdated guidance.
-- **Ultra-Fast & In-Memory (<30ms)**: Eliminates disk writes, shell spawns (`execSync`), and temporary files by pulling directly from Engram's HTTP server in memory.
-- **Zero Go Compilation & Zero Setup**: Pure TypeScript thin adapter that requires zero binary recompilation and zero external daemon/JSON configurations.
+- **Global Context Inheritance**: A bounded selection of `scope: global` observations is attached to the project graph. Personal observations in the selected project retain their scope; cross-project personal inheritance is not implemented.
+- **Conflict & Obsolescence Visibility**: Displays persisted, judged superseding and conflicting relationships and marks expired observations using `review_after`. It does not judge new conflicts or enforce which guidance an agent follows.
+- **Fast In-Memory Graph Build**: Data is fetched directly from the local Engram HTTP server and the graph is assembled in memory — no temporary files or shell spawns during the build phase. The final graph is then saved to `~/.engram/semantic-graph/` for agent and human consumption.
+- **No Go Recompilation**: Requires Node.js, a built CLI, and a running Engram HTTP server; no MCP configuration is needed.
 
 ---
 
 ## Key Features
 
-- **Smart Slicing**: Project-focused by default + inherited global organizational conventions (`GLOBAL_CONTEXT`). Fast, light (<50KB), and token-efficient.
+- **Project Slicing**: Project-focused by default, with up to 15 inherited global observations selected from the latest 20 fetched. Project observation content is not size-limited; there is no fixed byte or token budget.
 - **Topological Hierarchy**: Maps memories into a clear graph structure:
   `GLOBAL_CONTEXT` ➔ `PROJECT` ➔ `TOPIC` ➔ `OBSERVATION`.
-- **Dynamic Type Discovery**: Automatically discovers any custom observation types stored in SQLite and maps them to clean textual badges (e.g. `[CONVENTION]`, `[DECISION]`, `[ARCHITECTURE]`) without emojis or icons.
-- **Obsolescence Awareness**: Distinguishes between active and expired (`stale`) conventions via `review_after` lifecycle tracking.
-- **Semantic Relation Mapping**: Surfaces `SUPERSEDES`, `CONFLICTS_WITH`, and `RELATED_TO` edges from Engram's `memory_relations` judgments.
+- **Dynamic Type Discovery**: Maps observation types received from the API to textual badges (e.g. `[CONVENTION]`, `[DECISION]`, `[ARCHITECTURE]`).
+- **Obsolescence Awareness**: Excludes soft-deleted observations and, by default, expired observations. Native SQL timestamps are interpreted as UTC; deadlines at or before the build's reference time are stale.
+- **Semantic Relation Mapping**: Traverses all pages of judged `/conflicts` results and emits edges only when both endpoints are present. Original verdicts are retained in edge metadata.
 - **Interactive CLI**: Menu-driven terminal runner with support for direct CLI flags and automated exports.
 
 ---
@@ -31,6 +31,8 @@ Connects directly in-memory to the local Engram daemon (`http://127.0.0.1:7437`)
 ## Quick Start
 
 ### 1. Requirements
+Use Node.js 20.12 or later and npm. The lockfile includes the `tsx` test runner.
+
 Ensure your Engram server is running locally:
 
 ```bash
@@ -54,7 +56,7 @@ node dist/semantic-graph.js
 # Direct generation (active project + top global rules)
 node dist/semantic-graph.js --generate
 
-# Full store generation (all projects and history)
+# All projects, retaining separate project roots (default stale filtering still applies)
 node dist/semantic-graph.js --generate --all
 
 # Include expired/stale conventions
@@ -64,11 +66,35 @@ node dist/semantic-graph.js --generate --stale
 node dist/semantic-graph.js --generate --project engram
 ```
 
+### Project Resolution and Failures
+
+Selection order is `--all`, explicit `--project`, the caller's `ENGRAM_PROJECT`, then `/project/current?cwd=<caller-directory>`. The server applies its own resolver policy, including any server-side project override. Use `--project` when an explicit target is needed.
+
+Ambiguous discovery, HTTP failures, malformed responses, and detected incomplete/changing conflict pagination abort generation instead of producing a misleading empty graph. A failed fetch leaves an existing graph file unchanged. A valid empty response still generates an empty context graph.
+
+`ENGRAM_URL` overrides the server URL; otherwise `ENGRAM_PORT` overrides port 7437. `ENGRAM_HTTP_TOKEN` supplies Bearer authentication. Keep the server on loopback, or use HTTPS when configuring a remote URL.
+
+---
+
+## Output Location
+
+After running `--generate`, the graph is saved to:
+
+```
+~/.engram/semantic-graph/
+  engram_semantic_graph_<project>.json   # active project graph
+  engram_semantic_graph_all.json         # multi-project global graph (--all)
+```
+
+AI agents can read these files directly (e.g. via a skill or prompt injection) to reason about conventions, decisions, and architectural rules without querying the database.
+
+These are snapshots, not automatically refreshed context. Re-run generation after memory changes and inspect `slice.generatedAt` before consuming a saved graph. Files contain full observation content, including personal observations within the selected project; treat them as private memory exports.
+
 ---
 
 ## Output Structure
 
-The graph builder produces an enriched JSON structure containing nodes, edges, type catalog, and slice metadata:
+The graph builder produces nodes, edges, a type catalog, and slice metadata. Abbreviated single-project example:
 
 ```json
 {
@@ -95,7 +121,8 @@ The graph builder produces an enriched JSON structure containing nodes, edges, t
       "type": "architecture",
       "lifecycle": "active",
       "topic_key": "architecture/plugins",
-      "content": "Adapters in plugin/ must remain thin..."
+      "content": "Adapters in plugin/ must remain thin...",
+      "metadata": { "project": "engram" }
     }
   ],
   "edges": [
@@ -133,17 +160,27 @@ The graph builder produces an enriched JSON structure containing nodes, edges, t
 }
 ```
 
+In `--all` mode, each represented project has its own `PROJECT` node under `GLOBAL_CONTEXT`. Topic IDs encode `[project, topic]` as a JSON tuple, for example `topic:["engram","architecture/plugins"]`, so equal topic names in different projects do not merge. Single-project topic IDs remain unchanged. Observation and session metadata retain project provenance; missing observation projects are inferred from their session, then the selected project or `unknown-project` in all-project mode.
+
+Inherited globals with no resolvable source project are always marked `unknown-project`, never attributed to the consuming project. Sessions fetched only to resolve global provenance are not rendered as project sessions.
+
+`totalObservations`, `activeCount`, and `staleCount` describe non-deleted project/export observations before topic/type/stale filtering. `globalRulesTotal` counts non-deleted globals fetched, not all globals in the store. `--all` expands project selection but does not claim an exhaustive graph: stale filtering, inherited-global limits, and relation endpoint filtering still apply.
+
+The TypeScript builder also accepts `globalLimit`, `topicFilter`, `typeFilter`, and `includeSessions`; these are not CLI flags. `globalLimit: "all"` requires an all-project export because `/observations` has no pagination. Session nodes are disabled by default.
+
+The `/conflicts` endpoint excludes `not_conflict` verdicts and omits judgment reason/evidence/confidence. Generic edge descriptions are not the original judgment explanation. Other judged verdicts map to `RELATED_TO` while retaining their original verb in `metadata.relation`. Separate HTTP reads are not a transactional database snapshot; re-run if the store changes during generation.
+
 ---
 
 ## Architecture
 
-Follows Engram's thin adapter rules:
+Engram remains the source of truth. This plugin owns the derived graph representation, including local filtering and lifecycle display; it does not implement persistence, synchronization, or conflict judgment. That is more than a transport-only adapter. Any future move of shared memory semantics into Go core requires a separate architecture decision.
 
 ```
 src/
-├── types.ts              # 1:1 schema alignment with Engram Go models & graph types
+├── types.ts              # Consumed subsets of Engram models and graph types
 ├── core/
-│   ├── client.ts         # In-memory HTTP client (:7437 /export, /observations, /conflicts)
+│   ├── client.ts         # HTTP discovery, exports, globals, and paginated judged relations
 │   ├── derivations.ts    # Pure lifecycle, status, normalization & type registry helpers
 │   ├── builder.ts        # Graph assembly & smart slicing engine
 │   └── index.ts          # Core barrel exports
@@ -172,7 +209,7 @@ We are actively developing the presentation and consumption layer across two pri
 ## Testing & Quality
 
 ```bash
-# Run unit test suite (18 tests covering derivations, builder, and slicing)
+# Core, HTTP contract, pipeline, and isolated CLI regression tests
 npm test
 
 # Type check
@@ -181,6 +218,8 @@ npm run typecheck
 # Production build
 npm run build
 ```
+
+Tests use fixtures rather than the live Engram database. CLI tests run against a temporary local HTTP server and write only to a temporary home directory.
 
 ---
 
