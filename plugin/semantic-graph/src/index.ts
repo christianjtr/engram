@@ -92,6 +92,7 @@ Example:
     });
     console.log(`Graph saved (${stats.nodeCount} nodes, ${stats.edgeCount} edges)`);
     console.log(`File: ${stats.graphPath}`);
+    console.log(`Agent context: ${stats.contextPath}`);
 }
 
 if (require.main === module) {

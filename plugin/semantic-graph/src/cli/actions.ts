@@ -1,8 +1,10 @@
 import fs from "fs";
 import { randomUUID } from "crypto";
+import path from "path";
 import * as EngramServices from "../services/engram";
 import { buildSemanticGraph } from "../core/assembler";
-import { getSemanticGraphPath, ensureConfigDir } from "../config";
+import { renderAgentContext } from "../core/agentContext";
+import { getSemanticContextPath, getSemanticGraphPath, ensureConfigDir } from "../config";
 import { getCurrentProjectName } from "../utils/helpers";
 import type { EngramObservation, EngramSession, GraphBuildOptions } from "../types";
 
@@ -64,16 +66,29 @@ export async function runGenerateGraphAction(options?: GraphBuildOptions & { min
     // 3. Persist
     const projectName = graph.slice.project;
     const graphPath = getSemanticGraphPath(projectName);
-    const content = options?.minify ? JSON.stringify(graph) : JSON.stringify(graph, null, 2);
+    const contextPath = getSemanticContextPath(projectName);
+    const graphContent = options?.minify ? JSON.stringify(graph) : JSON.stringify(graph, null, 2);
+    const contextContent = renderAgentContext(graph, {
+        sourceGraph: path.basename(graphPath),
+    });
 
     ensureConfigDir();
 
-    const tempPath = `${graphPath}.tmp-${process.pid}-${randomUUID()}`;
+    const generationId = `${process.pid}-${randomUUID()}`;
+    const graphTempPath = `${graphPath}.tmp-${generationId}`;
+    const contextTempPath = `${contextPath}.tmp-${generationId}`;
     try {
-        await fs.promises.writeFile(tempPath, content, "utf-8");
-        await fs.promises.rename(tempPath, graphPath);
+        await Promise.all([
+            fs.promises.writeFile(graphTempPath, graphContent, "utf-8"),
+            fs.promises.writeFile(contextTempPath, contextContent, "utf-8"),
+        ]);
+        await fs.promises.rename(graphTempPath, graphPath);
+        await fs.promises.rename(contextTempPath, contextPath);
     } catch (error) {
-        await fs.promises.unlink(tempPath).catch(() => undefined);
+        await Promise.all([
+            fs.promises.unlink(graphTempPath).catch(() => undefined),
+            fs.promises.unlink(contextTempPath).catch(() => undefined),
+        ]);
         throw error;
     }
 
@@ -83,5 +98,6 @@ export async function runGenerateGraphAction(options?: GraphBuildOptions & { min
         edgeCount: graph.edges.length,
         slice: graph.slice,
         graphPath,
+        contextPath,
     };
 }

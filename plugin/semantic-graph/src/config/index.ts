@@ -24,6 +24,10 @@ export const getSemanticGraphFilename = (projectName: string): string =>
 export const getSemanticGraphPath = (projectName: string): string =>
     path.join(ENGRAM_DIR, `${getSemanticGraphFilename(projectName)}.json`);
 
+/** Returns the compact agent-context path for a project's graph snapshot. */
+export const getSemanticContextPath = (projectName: string): string =>
+    path.join(ENGRAM_DIR, `engram_semantic_context_${sanitizeProjectName(projectName)}.md`);
+
 /** Ensures the graph output directory exists, creating it if necessary. */
 export function ensureConfigDir(): void {
     if (!fs.existsSync(ENGRAM_DIR)) {

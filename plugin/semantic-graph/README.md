@@ -1,19 +1,18 @@
 # Engram Semantic Graph
 
-Standalone TypeScript CLI that reads Engram memory data through the local HTTP server and writes a derived semantic graph as JSON. Engram remains the source of truth: this package does not access SQLite, mutate memories, judge conflicts, or run synchronization.
-
-The graph connects global context, projects, topics, observations, optional sessions, and persisted judged relations. It is a snapshot for agents and humans, not an automatically refreshed context service.
+Standalone TypeScript CLI that reads Engram memory data through the local HTTP server and writes two derived snapshots: a complete semantic graph as JSON and a compact agent context as Markdown. Engram remains the source of truth: this package does not access SQLite, mutate memories, judge conflicts, or run synchronization.
 
 ## What It Provides
 
 - Project-scoped graphs by default, or a combined all-project graph.
 - A bounded global context: the default fetch reads up to 20 global observations and the builder includes up to 15 active observations.
 - Filtering of deleted observations and, by default, stale observations.
-- Stale detection from `review_after` using strict UTC `YYYY-MM-DD HH:mm:ss` timestamps. A timestamp at or before the build reference time is stale; missing or invalid timestamps remain active.
+- Strict UTC lifecycle handling for `review_after`; a timestamp at or before the build reference time is stale.
 - Project, topic, observation, and optional session nodes connected with typed edges.
-- Persisted judged relations from `/conflicts`, including `SUPERSEDES`, `CONFLICTS_WITH`, or `RELATED_TO` edges when both endpoints are in the graph.
+- Persisted judged relations from `/conflicts`, including `SUPERSEDES`, `CONFLICTS_WITH`, or `RELATED_TO` edges when both endpoints are present.
 - Schema validation for HTTP responses with Zod.
-- Atomic publication of the generated JSON through a temporary file and rename.
+- A deterministic `agent-context.md` projection derived from the same graph as the JSON.
+- Atomic publication of each artifact through unique temporary files and rename.
 
 The builder also supports topic and type filters, custom global limits, session nodes, and an injected reference date as a TypeScript API. These options are not exposed as CLI flags.
 
@@ -23,7 +22,7 @@ The builder also supports topic and type filters, custom global limits, session 
 - npm
 - A running Engram HTTP server
 
-Start the local server from the repository or an installed Engram binary:
+Start the local server:
 
 ```bash
 engram serve
@@ -41,7 +40,7 @@ npm run build
 
 The production bundle is written to `dist/semantic-graph.js`.
 
-The CLI is intentionally non-interactive: every invocation either prints help or generates a graph. This keeps it suitable for automation and agent workflows.
+The CLI is intentionally non-interactive. Every invocation either prints help or generates a graph and its companion agent context.
 
 ### Short CLI flags
 
@@ -73,7 +72,7 @@ node dist/semantic-graph.js -g -p engram
 # All projects
 node dist/semantic-graph.js -g -a
 
-# The package shortcut for explicit current-project generation
+# Package shortcut for explicit current-project generation
 npm run generate
 ```
 
@@ -81,7 +80,7 @@ Running without arguments generates the current-project graph. `-a` and `-p` can
 
 ## Project Resolution
 
-For a project-scoped generation, resolution follows this order:
+For project-scoped generation, resolution follows this order:
 
 1. `-a` selects all projects.
 2. `-p <name>` selects the explicit project.
@@ -91,8 +90,6 @@ For a project-scoped generation, resolution follows this order:
 The server may apply its own project resolver policy. Use `-p` when the target must be explicit.
 
 ## Server Configuration
-
-The HTTP client reads these environment variables:
 
 | Variable            | Default                 | Purpose                                 |
 | ------------------- | ----------------------- | --------------------------------------- |
@@ -105,17 +102,49 @@ Requests use a 10-second timeout by default. Keep the server on loopback, or use
 
 ## Output
 
-Graphs are saved under:
+Snapshots are saved under:
 
 ```text
 ~/.engram/semantic-graph/
   engram_semantic_graph_<project>.json
+  engram_semantic_context_<project>.md
   engram_semantic_graph_all.json
+  engram_semantic_context_all.md
 ```
 
-Project names are trimmed and path separators are replaced with `_` for filenames. The generated file contains full observation content, including personal observations within the selected project. Treat these files as private memory exports.
+Project names are trimmed and path separators are replaced with `_` for filenames. The JSON contains full observation content, including personal observations within the selected project. Treat both files as private memory exports.
 
-Generation failures leave the existing graph file unchanged. A valid empty response still produces an empty context graph. Separate HTTP requests are not one transactional database snapshot, so a graph should be regenerated if the store changes during generation.
+Generation failures leave existing snapshots unchanged when the failure occurs before publication. JSON and Markdown are generated from the same in-memory graph and share its `generatedAt` value, but two filesystem renames cannot form one transactional operation. Separate HTTP requests are not one transactional database snapshot; regenerate if the store changes during generation.
+
+### Agent context
+
+The Markdown snapshot is a bounded, deterministic view for low-cost initial agent context. It uses versioned front matter and prioritizes active decisions, architecture, conventions, relevant relations, provenance, and warnings. It is limited to 12,000 characters by default and retains observation IDs and topics so an agent can consult the full JSON or MCP for more detail. It is not a replacement for Engram or MCP.
+
+Example:
+
+```md
+---
+format: engram-agent-context
+version: 1
+project: engram
+generated_at: 2026-09-20T17:00:00.000Z
+source_graph: engram_semantic_graph_engram.json
+exhaustive: false
+---
+
+# Engram Agent Context
+
+## Active Decisions
+
+- [decision] Use HTTP boundaries instead of direct SQLite access.
+  topic: architecture/semantic-graph
+  project: engram
+  observation: obs:31
+
+## Warnings
+
+- This is a bounded snapshot and may omit historical observations.
+```
 
 ## Graph Format
 
@@ -190,22 +219,22 @@ The JSON document contains `nodes`, `edges`, `types`, and `slice`:
 
 ### All-project graphs
 
-In all-project mode, each represented project gets its own project node. Topic identity includes both project and topic in an encoded JSON tuple to prevent collisions between projects with equal topic names. For example, the topic `architecture/plugins` in project `engram` is represented as:
+In all-project mode, each represented project gets its own project node. Topic identity includes both project and topic in an encoded JSON tuple to prevent collisions. For example:
 
 ```text
 topic:%5B%22engram%22%2C%22architecture%2Fplugins%22%5D
 ```
 
-The original project and topic remain available in node metadata. Observation IDs and session IDs retain their Engram identity. An observation without a project uses its session project when that provenance is available; otherwise all-project graphs use `unknown-project`.
+The original project and topic remain available in node metadata. An observation without a project uses its session project when available; otherwise all-project graphs use `unknown-project`.
 
 ### Slice metadata
 
-- `totalObservations`: non-deleted, non-global observations received from the export.
+- `totalObservations`: non-deleted, non-global observations received from export.
 - `activeCount` and `staleCount`: matching project observations after topic/type filters and before stale observations are excluded from the node set.
 - `globalRulesInherited`: global observations that pass filters and lifecycle handling and are included after the global limit.
-- `globalRulesTotal`: non-deleted global observations received by the fetch path, not the total number stored in Engram.
+- `globalRulesTotal`: non-deleted global observations received by the fetch path, not the total stored in Engram.
 - `topicsCount`: topic nodes included in the graph.
-- `isExhaustive`: false for the CLI output unless a TypeScript caller explicitly sets it.
+- `isExhaustive`: false for CLI output unless a TypeScript caller explicitly sets it.
 - `generatedAt`: the UTC reference time used for lifecycle evaluation and snapshot metadata.
 
 Relations are fetched from all judged `/conflicts` pages. `not_conflict` relations are excluded by the server. Relation edges are emitted only when both endpoint observations are present. The original relation verb is retained as `metadata.relation`; the endpoint contract does not guarantee judgment evidence, confidence, or explanation fields.
@@ -223,11 +252,12 @@ services/engram       HTTP transport, validation, project selection
         v
 core/assembler        Pure graph construction and local filtering
         |
-        v
-cli/actions            Orchestration and atomic snapshot publication
+        +--> JSON graph snapshot
+        |
+        +--> agent-context Markdown renderer
         |
         v
-~/.engram/semantic-graph/*.json
+~/.engram/semantic-graph/*
 ```
 
 Source layout:
@@ -236,7 +266,7 @@ Source layout:
 src/
 ├── types/                # Graph, observation, and Engram entity types
 ├── services/engram/      # HTTP boundary and response schemas
-├── core/                 # Graph assembly and semantic rules
+├── core/                 # Graph assembly, semantic rules, and context renderer
 ├── cli/                  # CLI entry actions and graph generation
 ├── config/               # Snapshot paths and filename helpers
 ├── utils/                # Environment and project helpers
@@ -251,7 +281,7 @@ npm run build
 npm test
 ```
 
-The package has the `npm test` command configured for `tests/**/*.test.ts`; the dedicated TypeScript test suite is still being built. Current validation is therefore provided by typecheck, production build, and manual CLI/server smoke tests.
+The package has the `npm test` command configured for `tests/**/*.test.ts`; the dedicated TypeScript test suite is still being built. Current validation for this feature is provided by typecheck, production build, and manual CLI/server smoke tests.
 
 ## Planned Extensions
 
@@ -259,7 +289,6 @@ These are not implemented by the current CLI:
 
 - Interactive HTML visualization.
 - Mermaid export.
-- A token-optimized agent-context format.
 - An official agent skill for consuming the graph.
 
 ## License
