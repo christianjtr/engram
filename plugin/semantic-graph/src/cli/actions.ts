@@ -1,6 +1,6 @@
 import fs from "fs";
 import * as EngramServices from "../services/engram";
-import { buildSemanticGraph } from "../core/builder";
+import { buildSemanticGraph } from "../core/assembler";
 import { getSemanticGraphPath, getSemanticGraphFilename, ensureConfigDir, ENGRAM_DIR } from "../config";
 import { getCurrentProjectName } from "../utils/helpers";
 import type { EngramObservation, EngramSession, GraphBuildOptions } from "../types";
