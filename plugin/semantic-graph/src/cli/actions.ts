@@ -2,7 +2,7 @@ import fs from "fs";
 import { randomUUID } from "crypto";
 import * as EngramServices from "../services/engram";
 import { buildSemanticGraph } from "../core/assembler";
-import { getSemanticGraphPath, getSemanticGraphFilename, ensureConfigDir, ENGRAM_DIR } from "../config";
+import { getSemanticGraphPath, ensureConfigDir } from "../config";
 import { getCurrentProjectName } from "../utils/helpers";
 import type { EngramObservation, EngramSession, GraphBuildOptions } from "../types";
 
@@ -83,35 +83,5 @@ export async function runGenerateGraphAction(options?: GraphBuildOptions & { min
         edgeCount: graph.edges.length,
         slice: graph.slice,
         graphPath,
-    };
-}
-
-/**
- * Checks local file system for existing semantic graph snapshots.
- */
-export async function runStatsAction() {
-    const projectName = await getCurrentProjectName();
-    const graphPath = getSemanticGraphPath(projectName);
-    const allGraphPath = getSemanticGraphPath("all");
-
-    return {
-        projectName,
-        graphPath,
-        graphExists: fs.existsSync(graphPath),
-        allGraphPath,
-        allGraphExists: fs.existsSync(allGraphPath),
-    };
-}
-
-/**
- * Returns metadata for agent consumption instructions.
- */
-export async function runExportInfoAction() {
-    const projectName = await getCurrentProjectName();
-
-    return {
-        outputDir: ENGRAM_DIR,
-        projectFilename: `${getSemanticGraphFilename(projectName)}.json`,
-        globalFilename: `${getSemanticGraphFilename("all")}.json`,
     };
 }

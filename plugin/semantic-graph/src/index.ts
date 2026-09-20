@@ -1,9 +1,8 @@
-import { runCliMenu } from "./cli/runner";
 import { runGenerateGraphAction } from "./cli/actions";
 
 /**
  * Main entry point for the engram-semantic-graph CLI.
- * Runs the interactive menu by default, or handles flags directly.
+ * Generates an agent-consumable graph from the command line.
  */
 export function parseCliFlags(args: string[]): { all: boolean; includeStale: boolean; project?: string; minify: boolean } {
     const validFlags = new Set(["-g", "-a", "-p", "-s", "-h"]);
@@ -63,12 +62,12 @@ export async function main(): Promise<void> {
         console.log(`engram-semantic-graph v${__PLUGIN_VERSION__} — Deterministic semantic knowledge graph for Engram
 
 Usage:
-  engram-semantic-graph           Interactive menu
-    engram-semantic-graph -g        Generate graph (current project)
-    engram-semantic-graph -a        Generate graph for all projects
-    engram-semantic-graph -p <name> Generate graph for a specific project
-    engram-semantic-graph -s        Include stale observations
-    engram-semantic-graph -h        Show this help message
+    engram-semantic-graph             Generate graph (current project)
+    engram-semantic-graph -g          Generate graph (current project)
+    engram-semantic-graph -a          Generate graph for all projects
+    engram-semantic-graph -p <name>   Generate graph for a specific project
+    engram-semantic-graph -s          Include stale observations
+    engram-semantic-graph -h          Show this help message
 
 Notes:
     Only the short options shown above are supported.
@@ -82,28 +81,17 @@ Example:
         return;
     }
 
-    const wantsGenerate =
-        args.includes("-g") ||
-        args.includes("-a") ||
-        args.includes("-p") ||
-        args.includes("-s");
+    const { all, includeStale, project, minify } = parseCliFlags(args);
 
-    if (wantsGenerate) {
-        const { all, includeStale, project, minify } = parseCliFlags(args);
-
-        console.log(`Generating graph...`);
-        const stats = await runGenerateGraphAction({
-            minify,
-            all,
-            project,
-            includeStale,
-        });
-        console.log(`Graph saved (${stats.nodeCount} nodes, ${stats.edgeCount} edges)`);
-        console.log(`File: ${stats.graphPath}`);
-        return;
-    }
-
-    await runCliMenu();
+    console.log(`Generating graph...`);
+    const stats = await runGenerateGraphAction({
+        minify,
+        all,
+        project,
+        includeStale,
+    });
+    console.log(`Graph saved (${stats.nodeCount} nodes, ${stats.edgeCount} edges)`);
+    console.log(`File: ${stats.graphPath}`);
 }
 
 if (require.main === module) {
