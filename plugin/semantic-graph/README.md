@@ -41,13 +41,7 @@ npm run build
 
 The production bundle is written to `dist/semantic-graph.js`.
 
-### Interactive menu
-
-```bash
-npm start
-```
-
-The menu can generate a current-project graph, an all-project graph, show snapshot status, and show output locations.
+The CLI is intentionally non-interactive: every invocation either prints help or generates a graph. This keeps it suitable for automation and agent workflows.
 
 ### Short CLI flags
 
@@ -64,6 +58,9 @@ Only the short flags below are supported:
 Examples:
 
 ```bash
+# Current project using the package entry point
+npm start
+
 # Current project, excluding stale observations
 node dist/semantic-graph.js -g
 
@@ -76,11 +73,11 @@ node dist/semantic-graph.js -g -p engram
 # All projects
 node dist/semantic-graph.js -g -a
 
-# The package shortcut for the first command
+# The package shortcut for explicit current-project generation
 npm run generate
 ```
 
-`-a` and `-p` cannot be used together. `-p` requires a non-empty value. Unknown, duplicate, and positional arguments are rejected. `-g` is optional when another generation flag such as `-a`, `-p`, or `-s` is present.
+Running without arguments generates the current-project graph. `-a` and `-p` cannot be used together. `-p` requires a non-empty value. Unknown, duplicate, and positional arguments are rejected. `-g` is optional when another generation flag such as `-a`, `-p`, or `-s` is present.
 
 ## Project Resolution
 
@@ -240,7 +237,7 @@ src/
 ├── types/                # Graph, observation, and Engram entity types
 ├── services/engram/      # HTTP boundary and response schemas
 ├── core/                 # Graph assembly and semantic rules
-├── cli/                  # Interactive menu and generation actions
+├── cli/                  # CLI entry actions and graph generation
 ├── config/               # Snapshot paths and filename helpers
 ├── utils/                # Environment and project helpers
 └── index.ts              # CLI entry point and short-flag parser
