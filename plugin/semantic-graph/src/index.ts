@@ -35,8 +35,8 @@ Example:
 
     if (wantsGenerate) {
         const generateAll = args.includes("--all") || args.includes("-a");
-        const includeStale = args.includes("--stale");
-        const projectIdx = args.indexOf("--project");
+        const includeStale = args.includes("--stale") || args.includes("-s");
+        const projectIdx = args.findIndex(a => a === "--project" || a === "-p");
         const project = projectIdx !== -1 && args[projectIdx + 1] ? args[projectIdx + 1] : undefined;
         const minify = true;
 
