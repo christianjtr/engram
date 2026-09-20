@@ -9,13 +9,9 @@ import {
 import type {
     EngramExportPayload,
     EngramObservation,
+    EngramProjectSelection,
     EngramRelation
 } from "../../types";
-
-export interface EngramProjectSelection {
-    project?: string;
-    allProjects?: boolean;
-}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

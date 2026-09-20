@@ -72,3 +72,8 @@ export interface EngramExportPayload {
     observations: EngramObservation[];
     prompts?: EngramPrompt[];
 }
+
+export interface EngramProjectSelection {
+    project?: string;
+    allProjects?: boolean;
+}
