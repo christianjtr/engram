@@ -53,17 +53,17 @@ npm run build
 # Interactive menu
 node dist/semantic-graph.js
 
-# Direct generation (active project + top global rules)
-node dist/semantic-graph.js --generate
+# Direct generation (current project, minified by default)
+node dist/semantic-graph.js -g
 
-# All projects, retaining separate project roots (default stale filtering still applies)
-node dist/semantic-graph.js --generate --all
+# All projects
+node dist/semantic-graph.js -g -a
 
-# Include expired/stale conventions
-node dist/semantic-graph.js --generate --stale
+# Include stale/expired observations
+node dist/semantic-graph.js -g -s
 
 # Target a specific project
-node dist/semantic-graph.js --generate --project engram
+node dist/semantic-graph.js -g -p engram
 ```
 
 ### Project Resolution and Failures
@@ -178,15 +178,19 @@ Engram remains the source of truth. This plugin owns the derived graph represent
 
 ```
 src/
-├── types.ts              # Consumed subsets of Engram models and graph types
-├── core/
-│   ├── client.ts         # HTTP discovery, exports, globals, and paginated judged relations
-│   ├── derivations.ts    # Pure lifecycle, status, normalization & type registry helpers
-│   ├── builder.ts        # Graph assembly & smart slicing engine
-│   └── index.ts          # Core barrel exports
+├── types/                # Graph, observation, and Engram entity types
+├── services/engram/      # HTTP boundary (fetch, validation, project selection)
+│   ├── httpClient.ts     # Native fetch transport
+│   ├── schemas.ts        # Zod validation schemas
+│   └── services.ts       # High-level service operations
+├── core/                 # Pure graph construction logic
+│   ├── assembler.ts      # Graph assembly engine
+│   └── rules.ts          # Lifecycle, normalization, and type helpers
 ├── cli/
 │   ├── actions.ts        # Graph generation & status actions
 │   └── runner.ts         # Interactive terminal UI using @clack/prompts
+├── config/               # Output path helpers
+├── utils/                # Small environment helpers
 └── index.ts              # CLI entry point
 ```
 
