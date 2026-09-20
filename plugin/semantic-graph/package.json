@@ -1,47 +1,47 @@
 {
-  "name": "engram-semantic-graph",
-  "version": "1.0.0",
-  "description": "Deterministic semantic knowledge graph engine and CLI for Engram",
-  "main": "dist/semantic-graph.js",
-  "bin": {
-    "engram-semantic-graph": "dist/semantic-graph.js"
-  },
-  "private": true,
-  "files": [
-    "dist",
-    "README.md"
-  ],
-  "scripts": {
-    "preinstall": "npx lockfile-lint --path package-lock.json --type npm --allowed-hosts npm --validate-https --validate-integrity",
-    "clean": "rm -rf dist",
-    "build": "npm run clean && node esbuild.config.mjs",
-    "dev": "node esbuild.config.mjs --watch",
-    "start": "node dist/semantic-graph.js",
-    "generate": "node dist/semantic-graph.js --generate",
-    "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/**/*.test.ts"
-  },
-  "keywords": [
-    "engram",
-    "memory",
-    "ai",
-    "cli",
-    "knowledge-graph",
-    "semantic-graph"
-  ],
-  "author": "Christian Torrealba <christianjtr>",
-  "license": "MIT",
-  "dependencies": {
-    "@clack/prompts": "^1.7.0",
-    "dayjs": "^1.11.23",
-    "zod": "^4.4.3"
-  },
-  "devDependencies": {
-    "@types/node": "^20.19.43",
-    "builtin-modules": "^5.3.0",
-    "esbuild": "^0.28.2",
-    "lockfile-lint": "^4.14.1",
-    "tsx": "^4.19.0",
-    "typescript": "^5.0.0"
-  }
+    "name": "engram-semantic-graph",
+    "version": "1.0.0",
+    "description": "Deterministic semantic knowledge graph engine and CLI for Engram",
+    "main": "dist/semantic-graph.js",
+    "bin": {
+        "engram-semantic-graph": "dist/semantic-graph.js"
+    },
+    "private": true,
+    "files": [
+        "dist",
+        "README.md"
+    ],
+    "scripts": {
+        "preinstall": "npx lockfile-lint --path package-lock.json --type npm --allowed-hosts npm --validate-https --validate-integrity",
+        "clean": "rm -rf dist",
+        "build": "npm run clean && node esbuild.config.mjs",
+        "dev": "node esbuild.config.mjs --watch",
+        "start": "node dist/semantic-graph.js",
+        "generate": "node dist/semantic-graph.js -g",
+        "typecheck": "tsc --noEmit",
+        "test": "tsx --test tests/**/*.test.ts"
+    },
+    "keywords": [
+        "engram",
+        "memory",
+        "ai",
+        "cli",
+        "knowledge-graph",
+        "semantic-graph"
+    ],
+    "author": "Christian Torrealba <christianjtr>",
+    "license": "MIT",
+    "dependencies": {
+        "@clack/prompts": "^1.7.0",
+        "dayjs": "^1.11.23",
+        "zod": "^4.4.3"
+    },
+    "devDependencies": {
+        "@types/node": "^20.19.43",
+        "builtin-modules": "^5.3.0",
+        "esbuild": "^0.28.2",
+        "lockfile-lint": "^4.14.1",
+        "tsx": "^4.19.0",
+        "typescript": "^5.0.0"
+    }
 }
