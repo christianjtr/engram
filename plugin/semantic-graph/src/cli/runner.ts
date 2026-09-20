@@ -124,7 +124,7 @@ export async function runCliMenu(): Promise<void> {
 
     const actionHandlers: Record<MenuAction, () => Promise<void>> = {
         "generate": handleGenerateAction,
-        "export-info": handleExportInfoAction, // Updated to use the wrapper
+        "export-info": handleExportInfoAction,
         "stats": handleStatsAction,
         "exit": async () => {
             keepRunning = false;
