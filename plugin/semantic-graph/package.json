@@ -37,7 +37,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/node": "^20.19.43",
     "builtin-modules": "^5.3.0",
     "esbuild": "^0.28.2",
     "lockfile-lint": "^4.14.1",
