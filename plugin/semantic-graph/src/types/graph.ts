@@ -62,6 +62,7 @@ export interface SemanticGraph {
 export interface GraphBuildOptions {
     project?: string;
     all?: boolean;
+    referenceDate?: Date;
     globalLimit?: number | "all";
     includeStale?: boolean;
     includeSessions?: boolean;

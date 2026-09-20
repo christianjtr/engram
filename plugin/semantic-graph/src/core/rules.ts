@@ -1,8 +1,10 @@
 import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
 import utc from "dayjs/plugin/utc";
 import type { ObservationLifecycle, SessionStatus } from "../types";
 
 dayjs.extend(utc);
+dayjs.extend(customParseFormat);
 
 /**
  * Defines which observation types represent enforceable rules or architectural decisions.
@@ -28,10 +30,10 @@ export function calculateObservationLifecycle(
 ): ObservationLifecycle {
     if (!reviewAfter || !reviewAfter.trim()) return "active";
 
-    const reviewDate = dayjs.utc(reviewAfter, "YYYY-MM-DD HH:mm:ss");
+    const reviewDate = dayjs.utc(reviewAfter, "YYYY-MM-DD HH:mm:ss", true);
     if (!reviewDate.isValid()) return "active";
 
-    return reviewDate.isBefore(referenceDate) ? "stale" : "active";
+    return !reviewDate.isAfter(referenceDate) ? "stale" : "active";
 }
 
 /**

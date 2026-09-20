@@ -13,6 +13,8 @@ import type {
     EngramRelation
 } from "../../types";
 
+const MAX_CONFLICT_RELATIONS = 100_000;
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
@@ -102,6 +104,10 @@ export async function fetchConflicts(options?: EngramProjectSelection): Promise<
         });
 
         const { relations: page, total, limit, offset } = parseResponse(ConflictPageSchema, rawData, "/conflicts");
+
+        if (total > MAX_CONFLICT_RELATIONS) {
+            throw new Error(`Engram server returned too many conflict relations (maximum ${MAX_CONFLICT_RELATIONS})`);
+        }
 
         expectedTotal ??= total;
 

@@ -36,12 +36,13 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
         projectName,
         observations: inputObservations = [],
         globalObservations: inputGlobalObservations = [],
+        globalSessions = [],
         sessions = [],
         relations = [],
         options = {},
     } = input;
 
-    const referenceDate = new Date();
+    const referenceDate = options.referenceDate ?? new Date();
     const isAllProjects = Boolean(options.all);
     const fallbackProject = isAllProjects ? "unknown-project" : projectName;
     const topicFilter = options.topicFilter ? normalizeTopicKey(options.topicFilter) : undefined;
@@ -61,6 +62,7 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
     // Filter out deleted records upfront
     const validObservations = inputObservations.filter((obs) => obs.deleted_at == null && obs.scope !== "global");
     const validGlobals = inputGlobalObservations.filter((obs) => obs.deleted_at == null && obs.scope === "global");
+    const globalSessionsById = new Map(globalSessions.map((session) => [session.id, session]));
 
     // Core Data Structures
     const nodesMap = new Map<string, GraphNode>();
@@ -126,7 +128,7 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
             scope: obs.scope,
             content: obs.content,
             metadata: {
-                project: obs.project || fallbackProject,
+                project: obs.project || globalSessionsById.get(obs.session_id)?.project || fallbackProject,
                 sync_id: obs.sync_id,
                 created_at: obs.created_at,
             },
@@ -154,7 +156,7 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
 
         const rawTopic = normalizeTopicKey(obs.topic_key);
         const topicNodeId = isAllProjects
-            ? `topic:${project}:${rawTopic}`
+            ? `topic:${encodeURIComponent(JSON.stringify([project, rawTopic]))}`
             : `topic:${rawTopic}`;
 
         // Create Topic Node if missing

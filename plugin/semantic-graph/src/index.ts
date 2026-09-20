@@ -5,24 +5,47 @@ import { runGenerateGraphAction } from "./cli/actions";
  * Main entry point for the engram-semantic-graph CLI.
  * Runs the interactive menu by default, or handles flags directly.
  */
-function parseCliFlags(args: string[]): { all: boolean; includeStale: boolean; project?: string; minify: boolean } {
+export function parseCliFlags(args: string[]): { all: boolean; includeStale: boolean; project?: string; minify: boolean } {
     const validFlags = new Set(["-g", "-a", "-p", "-s", "-h"]);
-    const unknownFlag = args.find((arg) => arg.startsWith("-") && !validFlags.has(arg));
-    if (unknownFlag) {
-        throw new Error(`Unknown flag: ${unknownFlag}`);
-    }
+    const seenFlags = new Set<string>();
+    let generateAll = false;
+    let includeStale = false;
+    let project: string | undefined;
 
-    const generateAll = args.includes("-a");
-    const includeStale = args.includes("-s");
-    const projectIdx = args.findIndex((arg) => arg === "-p");
-    const project = projectIdx !== -1 ? args[projectIdx + 1] : undefined;
+    for (let index = 0; index < args.length; index++) {
+        const arg = args[index];
 
-    if (projectIdx !== -1 && !project) {
-        throw new Error("Missing value for -p");
+        if (!validFlags.has(arg)) {
+            throw new Error(arg.startsWith("-") ? `Unknown flag: ${arg}` : `Unexpected argument: ${arg}`);
+        }
+
+        if (arg === "-h") continue;
+        if (seenFlags.has(arg)) throw new Error(`Duplicate flag: ${arg}`);
+        seenFlags.add(arg);
+
+        if (arg === "-a") {
+            generateAll = true;
+            continue;
+        }
+
+        if (arg === "-s") {
+            includeStale = true;
+            continue;
+        }
+
+        if (arg === "-g") continue;
+
+        const projectValue = args[++index];
+        if (!projectValue || projectValue.startsWith("-")) {
+            throw new Error("Missing value for -p");
+        }
+
+        project = projectValue.trim();
+        if (!project) throw new Error("Missing value for -p");
     }
 
     if (generateAll && project) {
-        throw new Error("--all and --project cannot be used together");
+        throw new Error("-a and -p cannot be used together");
     }
 
     return {
