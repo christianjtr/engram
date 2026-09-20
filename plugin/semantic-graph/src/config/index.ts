@@ -11,9 +11,14 @@ export const ENGRAM_DIR = path.join(
     "semantic-graph"
 );
 
+/** Normalizes a project name into a safe, filesystem-friendly identifier. */
+export function sanitizeProjectName(projectName: string): string {
+    return projectName.trim().replace(/[/\\]+/g, "_") || "unknown-project";
+}
+
 /** Returns the canonical filename (without extension) for a project's graph. */
 export const getSemanticGraphFilename = (projectName: string): string =>
-    `engram_semantic_graph_${projectName}`;
+    `engram_semantic_graph_${sanitizeProjectName(projectName)}`;
 
 /** Returns the full absolute path for a project's graph JSON file. */
 export const getSemanticGraphPath = (projectName: string): string =>

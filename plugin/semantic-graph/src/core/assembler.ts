@@ -6,7 +6,8 @@ import type {
     GraphEdge,
     GraphEdgeRelation,
     GraphNode,
-    SemanticGraph
+    SemanticGraph,
+    TypeMetadata
 } from "../types";
 import {
     isConventionLike,
@@ -43,13 +44,23 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
     const referenceDate = new Date();
     const isAllProjects = Boolean(options.all);
     const fallbackProject = isAllProjects ? "unknown-project" : projectName;
-
-    // Filter out deleted records upfront
-    const validObservations = inputObservations.filter((obs) => obs.deleted_at == null);
-    const validGlobals = inputGlobalObservations.filter((obs) => obs.deleted_at == null);
-
+    const topicFilter = options.topicFilter ? normalizeTopicKey(options.topicFilter) : undefined;
+    const typeFilter = new Set((options.typeFilter ?? []).map((type) => normalizeObservationType(type)));
     const includeStale = options.includeStale ?? false;
     const includeSessions = options.includeSessions ?? false;
+
+    const matchesFilters = (obs: Pick<EngramObservation, "topic_key" | "type">): boolean => {
+        const topic = normalizeTopicKey(obs.topic_key);
+        const type = normalizeObservationType(obs.type);
+
+        if (topicFilter && topic !== topicFilter) return false;
+        if (typeFilter.size > 0 && !typeFilter.has(type)) return false;
+        return true;
+    };
+
+    // Filter out deleted records upfront
+    const validObservations = inputObservations.filter((obs) => obs.deleted_at == null && obs.scope !== "global");
+    const validGlobals = inputGlobalObservations.filter((obs) => obs.deleted_at == null && obs.scope === "global");
 
     // Core Data Structures
     const nodesMap = new Map<string, GraphNode>();
@@ -93,6 +104,7 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
 
     // ── 2. Global Rules ──────────────────────────────────────────────────────
     const processedGlobals = validGlobals.filter((obs) => {
+        if (!matchesFilters(obs)) return false;
         const lifecycle = calculateObservationLifecycle(obs.review_after, referenceDate);
         return includeStale || lifecycle === "active";
     });
@@ -127,6 +139,8 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
     const includedProjectObservations: EngramObservation[] = [];
 
     for (const obs of validObservations) {
+        if (!matchesFilters(obs)) continue;
+
         const lifecycle = calculateObservationLifecycle(obs.review_after, referenceDate);
         if (lifecycle === "active") activeCount++;
         if (lifecycle === "stale") staleCount++;
@@ -139,7 +153,9 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
         const projectRootId = ensureProjectNode(project);
 
         const rawTopic = normalizeTopicKey(obs.topic_key);
-        const topicNodeId = isAllProjects ? `topic:${project}:${rawTopic}` : `topic:${rawTopic}`;
+        const topicNodeId = isAllProjects
+            ? `topic:${project}:${rawTopic}`
+            : `topic:${rawTopic}`;
 
         // Create Topic Node if missing
         if (!topicNodesCreated.has(topicNodeId)) {
@@ -224,6 +240,12 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
             target: targetId,
             relation: edgeRel,
             reason: rel.reason || `Judged relation: ${rel.relation}`,
+            metadata: {
+                relation: rel.relation,
+                judgment_status: rel.judgment_status,
+                evidence: rel.evidence,
+                confidence: rel.confidence,
+            },
         });
     }
 
@@ -233,14 +255,14 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
         if (node.category === "OBSERVATION" && node.type) uniqueTypes.add(node.type);
     });
 
-    const typesRegistry = Array.from(uniqueTypes).reduce((acc, type) => {
+    const typesRegistry = Array.from(uniqueTypes).reduce<Record<string, TypeMetadata>>((acc, type) => {
         acc[type] = {
             type,
             label: type.toUpperCase(),
             isConventionLike: isConventionLike(type),
         };
         return acc;
-    }, {} as Record<string, any>);
+    }, {});
 
     return {
         nodes: Array.from(nodesMap.values()),

@@ -66,7 +66,10 @@ export async function runGenerateGraphAction(options?: GraphBuildOptions & { min
     const content = options?.minify ? JSON.stringify(graph) : JSON.stringify(graph, null, 2);
 
     ensureConfigDir();
-    await fs.promises.writeFile(graphPath, content, "utf-8");
+
+    const tempPath = `${graphPath}.tmp-${process.pid}`;
+    await fs.promises.writeFile(tempPath, content, "utf-8");
+    await fs.promises.rename(tempPath, graphPath);
 
     return {
         projectName,
