@@ -33,7 +33,7 @@
   "license": "MIT",
   "dependencies": {
     "@clack/prompts": "^1.7.0",
-    "graphlib": "^2.1.8",
+    "dayjs": "^1.11.23",
     "zod": "^4.4.3"
   },
   "devDependencies": {
