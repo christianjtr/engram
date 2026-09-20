@@ -4,12 +4,24 @@ interface EngramClientOptions {
     timeoutMs?: number;
 }
 
+const MAX_ERROR_BODY_LENGTH = 1_000;
+
 function resolveConfig(options?: EngramClientOptions) {
     const envPort = process.env.ENGRAM_PORT || "7437";
     const envUrl = process.env.ENGRAM_URL || `http://127.0.0.1:${envPort}`;
     const baseUrl = (options?.baseUrl ?? envUrl).replace(/\/+$/, "");
     const token = options?.token ?? process.env.ENGRAM_HTTP_TOKEN;
     const timeoutMs = options?.timeoutMs ?? 10_000;
+
+    try {
+        new URL(baseUrl);
+    } catch {
+        throw new Error(`Invalid Engram server URL: ${baseUrl}`);
+    }
+
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+        throw new Error("Engram HTTP timeout must be a positive finite number");
+    }
 
     return { baseUrl, token, timeoutMs };
 }
@@ -65,7 +77,10 @@ async function engramFetch<T>(
 
     if (!response.ok) {
         const body = await response.text().catch(() => "");
-        throw new Error(`Engram server responded with HTTP ${response.status} ${response.statusText} on ${endpoint}: ${body}`);
+        const detail = body.length > MAX_ERROR_BODY_LENGTH
+            ? `${body.slice(0, MAX_ERROR_BODY_LENGTH)}...`
+            : body;
+        throw new Error(`Engram server responded with HTTP ${response.status} ${response.statusText} on ${endpoint}: ${detail}`);
     }
 
     return (await response.json()) as T;

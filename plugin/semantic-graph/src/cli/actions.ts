@@ -1,4 +1,5 @@
 import fs from "fs";
+import { randomUUID } from "crypto";
 import * as EngramServices from "../services/engram";
 import { buildSemanticGraph } from "../core/assembler";
 import { getSemanticGraphPath, getSemanticGraphFilename, ensureConfigDir, ENGRAM_DIR } from "../config";
@@ -67,9 +68,14 @@ export async function runGenerateGraphAction(options?: GraphBuildOptions & { min
 
     ensureConfigDir();
 
-    const tempPath = `${graphPath}.tmp-${process.pid}`;
-    await fs.promises.writeFile(tempPath, content, "utf-8");
-    await fs.promises.rename(tempPath, graphPath);
+    const tempPath = `${graphPath}.tmp-${process.pid}-${randomUUID()}`;
+    try {
+        await fs.promises.writeFile(tempPath, content, "utf-8");
+        await fs.promises.rename(tempPath, graphPath);
+    } catch (error) {
+        await fs.promises.unlink(tempPath).catch(() => undefined);
+        throw error;
+    }
 
     return {
         projectName,
