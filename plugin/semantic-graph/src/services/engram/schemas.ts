@@ -8,9 +8,9 @@ import type {
     ScopeType
 } from "../../types";
 
-export const ScopeTypeSchema = z.enum(["project", "global", "personal"]) satisfies z.ZodType<ScopeType>;
+const ScopeTypeSchema = z.enum(["project", "global", "personal"]) satisfies z.ZodType<ScopeType>;
 
-export const ObservationSchema = z.object({
+const ObservationSchema = z.object({
     id: z.number().int(),
     sync_id: z.string(),
     session_id: z.string(),
@@ -30,7 +30,7 @@ export const ObservationSchema = z.object({
     deleted_at: z.string().nullable().optional(),
 }) satisfies z.ZodType<EngramObservation>;
 
-export const SessionSchema = z.object({
+const SessionSchema = z.object({
     id: z.string(),
     project: z.string(),
     ownership_mode: z.string().optional(),
@@ -40,7 +40,7 @@ export const SessionSchema = z.object({
     summary: z.string().nullable().optional(),
 }) satisfies z.ZodType<EngramSession>;
 
-export const PromptSchema = z.object({
+const PromptSchema = z.object({
     id: z.number().int(),
     sync_id: z.string(),
     session_id: z.string(),
@@ -66,7 +66,7 @@ export const GlobalObservationsSchema = z.array(ObservationSchema)
     .nullable()
     .transform((val) => val ?? []) satisfies z.ZodType<EngramObservation[]>;
 
-export const JudgedRelationSchema = z.object({
+const JudgedRelationSchema = z.object({
     sync_id: z.string().min(1),
     source_id: z.string().min(1),
     target_id: z.string().min(1),

@@ -1,4 +1,4 @@
-export interface EngramClientOptions {
+interface EngramClientOptions {
     baseUrl?: string;
     token?: string;
     timeoutMs?: number;
@@ -38,7 +38,7 @@ function buildUrl(
 /**
  * Low-level HTTP GET transport helper using native Fetch API.
  */
-export async function engramFetch<T>(
+async function engramFetch<T>(
     endpoint: string,
     params?: Record<string, string | number | boolean | undefined>,
     options?: EngramClientOptions
