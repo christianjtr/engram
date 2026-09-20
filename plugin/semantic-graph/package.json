@@ -32,7 +32,6 @@
     "author": "Christian Torrealba <christianjtr>",
     "license": "MIT",
     "dependencies": {
-        "@clack/prompts": "^1.7.0",
         "dayjs": "^1.11.23",
         "zod": "^4.4.3"
     },
