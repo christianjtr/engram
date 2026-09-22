@@ -80,7 +80,7 @@ export interface JudgedEdge {
     target: string;
     relation: "SUPERSEDES" | "CONFLICTS_WITH" | "RELATED_TO";
     reason: string;
-    metadata: { relation: string; judgment_status: string };
+    metadata?: { relation: string; judgment_status: string };
 }
 
 export type GraphEdge = StructuralEdge | JudgedEdge;
@@ -105,11 +105,9 @@ export interface SemanticGraph {
 }
 
 export interface GraphBuildOptions {
-    project?: string;
     all?: boolean;
     referenceDate?: Date;
     globalLimit?: number;
-    allGlobals?: boolean;
     includeStale?: boolean;
     includeSessions?: boolean;
     topicFilter?: string;

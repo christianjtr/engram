@@ -6,9 +6,7 @@ import type { GraphBuildOptions } from "../types/graph";
 export async function fetchEngramData(options?: GraphBuildOptions) {
     try {
         const isAll = Boolean(options?.all);
-        const projectName = isAll
-            ? "all"
-            : (options?.project?.trim() || await EngramServices.getCurrentProjectName());
+        const projectName = isAll ? "all" : await EngramServices.getCurrentProjectName();
 
         const selection = {
             project: isAll ? undefined : projectName,
@@ -17,6 +15,7 @@ export async function fetchEngramData(options?: GraphBuildOptions) {
 
         const exportPromise = EngramServices.fetchExport(selection);
         const conflictsPromise = EngramServices.fetchConflicts(selection);
+
         let globalsPromise: Promise<EngramObservation[]>;
 
         if (isAll) {

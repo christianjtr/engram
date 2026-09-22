@@ -11,8 +11,7 @@ Standalone TypeScript CLI that reads Engram memory data through the local HTTP s
 - Project, topic, observation, and optional session nodes connected with typed edges.
 - Persisted judged relations from `/conflicts`, including `SUPERSEDES`, `CONFLICTS_WITH`, or `RELATED_TO` edges when both endpoints are present.
 - Schema validation for HTTP responses with Zod.
-- A deterministic `agent-context.md` projection derived from the same graph as the JSON.
-- Atomic publication of each artifact through unique temporary files and rename.
+- Atomic publication through unique temporary files and rename.
 
 The builder also supports topic and type filters, custom global limits, session nodes, and an injected reference date as a TypeScript API. --global-limit and --all-globals expose the options in the CLI.
 
@@ -46,48 +45,41 @@ The CLI is intentionally non-interactive. Every invocation either prints help or
 
 Only the short flags below are supported:
 
-| Flag        | Meaning                                    |
-| ----------- | ------------------------------------------ |
-| `-g`        | Generate the current-project graph         |
-| `-a`        | Generate one graph containing all projects |
-| `-p <name>` | Generate a graph for an explicit project   |
-| `-s`        | Include stale observations                 |
-| `-h`        | Print help                                 |
+| Flag                  | Meaning                                    |
+| --------------------- | ------------------------------------------ |
+| `-a`                  | Generate one graph containing all projects |
+| `-s`                  | Include stale observations                 |
+| `--global-limit=<n>`  | Limit number of global observations        |
+| `--all-globals`       | Include all global observations            |
+| `-h`                  | Print help                                 |
 
 Examples:
 
 ```bash
-# Current project using the package entry point
+# Current project (default)
 npm start
 
-# Current project, excluding stale observations
-node dist/semantic-graph.js -g
-
 # Current project, including stale observations
-node dist/semantic-graph.js -g -s
-
-# A specific project
-node dist/semantic-graph.js -g -p engram
+node dist/semantic-graph.js -s
 
 # All projects
-node dist/semantic-graph.js -g -a
+node dist/semantic-graph.js -a
 
-# Package shortcut for explicit current-project generation
+# Package shortcut
 npm run generate
 ```
 
-Running without arguments generates the current-project graph. `-a` and `-p` cannot be used together. `-p` requires a non-empty value. Unknown, duplicate, and positional arguments are rejected. `-g` is optional when another generation flag such as `-a`, `-p`, or `-s` is present.
+Running without arguments generates the current-project graph. `-a` cannot be combined with explicit project selection. Unknown, duplicate, and positional arguments are rejected.
 
 ## Project Resolution
 
 For project-scoped generation, resolution follows this order:
 
 1. `-a` selects all projects.
-2. `-p <name>` selects the explicit project.
-3. `ENGRAM_PROJECT` selects the project from the environment.
-4. The CLI asks `/project/current?cwd=<caller-directory>` for Engram's canonical resolution.
+2. `ENGRAM_PROJECT` selects the project from the environment.
+3. The CLI asks `/project/current?cwd=<caller-directory>` for Engram's canonical resolution.
 
-The server may apply its own project resolver policy. Use `-p` when the target must be explicit.
+The server may apply its own project resolver policy.
 
 ## Server Configuration
 
@@ -107,44 +99,12 @@ Snapshots are saved under:
 ```text
 ~/.engram/semantic-graph/
   engram_semantic_graph_<project>.json
-  engram_semantic_context_<project>.md
   engram_semantic_graph_all.json
-  engram_semantic_context_all.md
 ```
 
-Project names are trimmed and path separators are replaced with `_` for filenames. The JSON contains full observation content, including personal observations within the selected project. Treat both files as private memory exports.
+Project names are trimmed and path separators are replaced with `_` for filenames. The JSON contains full observation content, including personal observations within the selected project. Treat it as a private memory export.
 
-Generation failures leave existing snapshots unchanged when the failure occurs before publication. JSON and Markdown are generated from the same in-memory graph and share its `generatedAt` value, but two filesystem renames cannot form one transactional operation. Separate HTTP requests are not one transactional database snapshot; regenerate if the store changes during generation.
-
-### Agent context
-
-The Markdown snapshot is a bounded, deterministic view for low-cost initial agent context. It uses versioned front matter and prioritizes active decisions, architecture, conventions, relevant relations, provenance, and warnings. It is limited to 12,000 characters by default and retains observation IDs and topics so an agent can consult the full JSON or MCP for more detail. It is not a replacement for Engram or MCP.
-
-Example:
-
-```md
----
-format: engram-agent-context
-version: 1
-project: engram
-generated_at: 2026-09-20T17:00:00.000Z
-source_graph: engram_semantic_graph_engram.json
-exhaustive: false
----
-
-# Engram Agent Context
-
-## Active Decisions
-
-- [decision] Use HTTP boundaries instead of direct SQLite access.
-  topic: architecture/semantic-graph
-  project: engram
-  observation: obs:31
-
-## Warnings
-
-- This is a bounded snapshot and may omit historical observations.
-```
+Generation failures leave the existing snapshot unchanged when the failure occurs before publication. Separate HTTP requests are not one transactional database snapshot; regenerate if the store changes during generation.
 
 ## Graph Format
 
@@ -250,14 +210,10 @@ Engram HTTP server
 services/engram       HTTP transport, validation, project selection
         |
         v
-core/assembler        Pure graph construction and local filtering
-        |
-        +--> JSON graph snapshot
-        |
-        +--> agent-context Markdown renderer
+core/graph            Pure graph construction and local filtering
         |
         v
-~/.engram/semantic-graph/*
+~/.engram/semantic-graph/*.json
 ```
 
 Source layout:
@@ -266,10 +222,11 @@ Source layout:
 src/
 ├── types/                # Graph, observation, and Engram entity types
 ├── services/engram/      # HTTP boundary and response schemas
-├── core/                 # Graph assembly, semantic rules, and context renderer
+├── core/                 # Graph assembly and semantic rules
 ├── cli/                  # CLI entry actions and graph generation
 ├── config/               # Snapshot paths and filename helpers
-├── utils/                # Environment and project helpers
+├── utils/                # Filesystem helpers
+├── visualizer/           # Local web visualizer server and UI
 └── index.ts              # CLI entry point and short-flag parser
 ```
 
@@ -285,9 +242,8 @@ The package has the `npm test` command configured for `tests/**/*.test.ts`; the 
 
 ## Planned Extensions
 
-These are not implemented by the current CLI:
+These are not implemented yet:
 
-- Interactive HTML visualization.
 - Mermaid export.
 - An official agent skill for consuming the graph.
 

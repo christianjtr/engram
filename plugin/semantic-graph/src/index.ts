@@ -9,51 +9,37 @@ export async function main(): Promise<void> {
         console.log(`engram-semantic-graph v${__PLUGIN_VERSION__} — Knowledge graph & agent context generator
 
 Usage:
-    engram-semantic-graph   Generate graph for current project (default)
+    engram-semantic-graph   Generate graph for the current harness project (default)
     engram-semantic-graph [flags]
     npx engram-semantic-graph [flags]
 
 Flags:
-    -a          Generate graph for all projects
-    -p <name>   Generate graph for a specific project
-    --global-limit=<n>  Number of global observations (default ${DEFAULT_GLOBAL_LIMIT})
-    --all-globals       Include all global observations
-    -s                  Include stale observations
-    -v                  Launch web visualizer server
-    -h                  Show this help message
+    -a                      Generate a consolidated graph for all projects
+    --global-limit=<n>      Limit global observations (default ${DEFAULT_GLOBAL_LIMIT})
+    -s                      Include stale observations
+    -h                      Show this help message
 
 Examples:
     engram-semantic-graph
-    engram-semantic-graph -p myproject -s
-    engram-semantic-graph --global-limit=20
-    engram-semantic-graph --all-globals
-    engram-semantic-graph -v
+    engram-semantic-graph --global-limit=20 -s
+    engram-semantic-graph -a
 
     (Or run without installing using 'npx engram-semantic-graph ...')
+    (To launch the web visualizer, use: npm run visualize)
 `);
         return;
     }
 
     const flags = parseCliFlags(args);
 
-    // if (flags.visualize) {
-    //     console.log("Starting visualizer server...");
-    //     const { startVisualizerServer } = await import("./visualizer/server");
-    //     await startVisualizerServer({ project: flags.project });
-    //     return;
-    // }
-
     console.log("Generating graph...");
     const stats = await runGenerateGraph(flags);
 
     console.log(`Graph saved (${stats.nodeCount} nodes, ${stats.edgeCount} edges)`);
     console.log(`File: ${stats.graphPath}`);
-    console.log(`Agent context: ${stats.contextPath}`);
 }
 
-if (require.main === module) {
-    main().catch((error) => {
-        console.error("Error:", error instanceof Error ? error.message : error);
-        process.exit(1);
-    });
-}
+main().catch((error) => {
+    console.error("Error:", error instanceof Error ? error.message : error);
+    process.exit(1);
+});
