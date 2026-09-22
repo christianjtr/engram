@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Engram — Memory Navigator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+
+    <!-- Sidebar -->
+    <aside id="sidebar">
+        <div id="sidebar-header">
+            <div id="brand">
+                <svg id="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 3 L21 3 L21 21 L3 21 Z" />
+                    <circle cx="7" cy="7" r="2.2" />
+                    <circle cx="17" cy="7" r="2.2" />
+                    <circle cx="12" cy="12" r="2.2" />
+                    <circle cx="7" cy="17" r="2.2" />
+                    <circle cx="17" cy="17" r="2.2" />
+                    <line x1="9.2" y1="7" x2="14.8" y2="7" />
+                    <line x1="9.2" y1="17" x2="14.8" y2="17" />
+                    <line x1="7" y1="9.2" x2="7" y2="14.8" />
+                    <line x1="17" y1="9.2" x2="17" y2="14.8" />
+                </svg>
+                <div id="brand-text">
+                    <span id="brand-name">Engram</span>
+                    <span id="brand-sub">Memory Navigator</span>
+                </div>
+            </div>
+            <button id="btn-collapse" title="Collapse sidebar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                    <line x1="3" y1="6" x2="21" y2="6"/>
+                    <line x1="3" y1="12" x2="21" y2="12"/>
+                    <line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
+            </button>
+        </div>
+
+        <div id="sidebar-search">
+            <div id="search-wrap">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                    <circle cx="11" cy="11" r="7"/>
+                    <line x1="16.5" y1="16.5" x2="22" y2="22"/>
+                </svg>
+                <input id="search" type="text" placeholder="Search memory…" autocomplete="off" spellcheck="false">
+                <button id="search-clear" class="hidden">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div id="filter-bar">
+            <span class="filter-label">Filter</span>
+            <div id="filter-chips"></div>
+        </div>
+
+        <nav id="tree"></nav>
+
+        <div id="sidebar-footer">
+            <div id="stats"></div>
+        </div>
+    </aside>
+
+    <div id="sidebar-rail" class="hidden">
+        <button id="btn-expand" title="Expand sidebar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="18" x2="21" y2="18"/>
+            </svg>
+        </button>
+        <svg id="rail-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 3 L21 3 L21 21 L3 21 Z" />
+            <circle cx="7" cy="7" r="2.2" />
+            <circle cx="17" cy="7" r="2.2" />
+            <circle cx="12" cy="12" r="2.2" />
+            <circle cx="7" cy="17" r="2.2" />
+            <circle cx="17" cy="17" r="2.2" />
+            <line x1="9.2" y1="7" x2="14.8" y2="7" />
+            <line x1="9.2" y1="17" x2="14.8" y2="17" />
+            <line x1="7" y1="9.2" x2="7" y2="14.8" />
+            <line x1="17" y1="9.2" x2="17" y2="14.8" />
+        </svg>
+    </div>
+
+    <main id="main">
+        <div id="topbar">
+            <div id="breadcrumb"></div>
+            <div id="topbar-right">
+                <div id="zoom-controls">
+                    <button class="tb-btn" id="btn-zoom-out" title="Zoom out">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </button>
+                    <span id="zoom-label">100%</span>
+                    <button class="tb-btn" id="btn-zoom-in" title="Zoom in">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </button>
+                    <button class="tb-btn tb-btn-text" id="btn-fit" title="Fit graph to screen">Fit</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="canvas-wrap">
+            <canvas id="canvas"></canvas>
+            <div id="canvas-empty">
+                <p>Select a node from the sidebar</p>
+            </div>
+        </div>
+    </main>
+
+    <aside id="drawer" class="drawer-closed">
+        <button id="drawer-close" title="Close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <div id="drawer-inner">
+            <div id="drawer-header">
+                <span id="drawer-badge"></span>
+                <h2 id="drawer-title"></h2>
+            </div>
+            <div id="drawer-content"></div>
+        </div>
+    </aside>
+
+</div>
+
+<div id="modal-overlay" class="hidden">
+    <div id="modal">
+        <div id="modal-header">
+            <span id="modal-title">Relation</span>
+            <button id="modal-close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div id="modal-body"></div>
+    </div>
+</div>
+
+<div id="tooltip"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
