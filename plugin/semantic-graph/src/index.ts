@@ -1,103 +1,59 @@
-import { runGenerateGraphAction } from "./cli/actions";
-
-/**
- * Main entry point for the engram-semantic-graph CLI.
- * Generates an agent-consumable graph from the command line.
- */
-export function parseCliFlags(args: string[]): { all: boolean; includeStale: boolean; project?: string; minify: boolean } {
-    const validFlags = new Set(["-g", "-a", "-p", "-s", "-h"]);
-    const seenFlags = new Set<string>();
-    let generateAll = false;
-    let includeStale = false;
-    let project: string | undefined;
-
-    for (let index = 0; index < args.length; index++) {
-        const arg = args[index];
-
-        if (!validFlags.has(arg)) {
-            throw new Error(arg.startsWith("-") ? `Unknown flag: ${arg}` : `Unexpected argument: ${arg}`);
-        }
-
-        if (arg === "-h") continue;
-        if (seenFlags.has(arg)) throw new Error(`Duplicate flag: ${arg}`);
-        seenFlags.add(arg);
-
-        if (arg === "-a") {
-            generateAll = true;
-            continue;
-        }
-
-        if (arg === "-s") {
-            includeStale = true;
-            continue;
-        }
-
-        if (arg === "-g") continue;
-
-        const projectValue = args[++index];
-        if (!projectValue || projectValue.startsWith("-")) {
-            throw new Error("Missing value for -p");
-        }
-
-        project = projectValue.trim();
-        if (!project) throw new Error("Missing value for -p");
-    }
-
-    if (generateAll && project) {
-        throw new Error("-a and -p cannot be used together");
-    }
-
-    return {
-        all: generateAll,
-        includeStale,
-        project,
-        minify: true,
-    };
-}
+import { runGenerateGraph } from "./cli/runner";
+import { parseCliFlags } from "./cli/parseCliFlags";
+import { DEFAULT_GLOBAL_LIMIT } from "./config";
 
 export async function main(): Promise<void> {
     const args = process.argv.slice(2);
 
     if (args.includes("-h")) {
-        console.log(`engram-semantic-graph v${__PLUGIN_VERSION__} — Deterministic semantic knowledge graph for Engram
+        console.log(`engram-semantic-graph v${__PLUGIN_VERSION__} — Knowledge graph & agent context generator
 
 Usage:
-    engram-semantic-graph             Generate graph (current project)
-    engram-semantic-graph -g          Generate graph (current project)
-    engram-semantic-graph -a          Generate graph for all projects
-    engram-semantic-graph -p <name>   Generate graph for a specific project
-    engram-semantic-graph -s          Include stale observations
-    engram-semantic-graph -h          Show this help message
+    engram-semantic-graph   Generate graph for current project (default)
+    engram-semantic-graph [flags]
+    npx engram-semantic-graph [flags]
 
-Notes:
-    Only the short options shown above are supported.
-    In all-project mode, topic identifiers are compact and project-qualified
-    (for example: project:topic-name).
+Flags:
+    -a          Generate graph for all projects
+    -p <name>   Generate graph for a specific project
+    --global-limit=<n>  Number of global observations (default ${DEFAULT_GLOBAL_LIMIT})
+    --all-globals       Include all global observations
+    -s                  Include stale observations
+    -v                  Launch web visualizer server
+    -h                  Show this help message
 
-Example:
-  engram-semantic-graph -p myproject -s
+Examples:
+    engram-semantic-graph
+    engram-semantic-graph -p myproject -s
+    engram-semantic-graph --global-limit=20
+    engram-semantic-graph --all-globals
+    engram-semantic-graph -v
+
+    (Or run without installing using 'npx engram-semantic-graph ...')
 `);
-
         return;
     }
 
-    const { all, includeStale, project, minify } = parseCliFlags(args);
+    const flags = parseCliFlags(args);
 
-    console.log(`Generating graph...`);
-    const stats = await runGenerateGraphAction({
-        minify,
-        all,
-        project,
-        includeStale,
-    });
+    // if (flags.visualize) {
+    //     console.log("Starting visualizer server...");
+    //     const { startVisualizerServer } = await import("./visualizer/server");
+    //     await startVisualizerServer({ project: flags.project });
+    //     return;
+    // }
+
+    console.log("Generating graph...");
+    const stats = await runGenerateGraph(flags);
+
     console.log(`Graph saved (${stats.nodeCount} nodes, ${stats.edgeCount} edges)`);
     console.log(`File: ${stats.graphPath}`);
     console.log(`Agent context: ${stats.contextPath}`);
 }
 
 if (require.main === module) {
-    main().catch((err) => {
-        console.error("Error:", err instanceof Error ? err.message : err);
+    main().catch((error) => {
+        console.error("Error:", error instanceof Error ? error.message : error);
         process.exit(1);
     });
 }

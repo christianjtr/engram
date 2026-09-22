@@ -1,1 +1,1 @@
-export * from "./services";
+export * as EngramServices from "./services";

@@ -1,7 +1,5 @@
 import type { ObservationLifecycle, SessionStatus, TypeMetadata } from "./observation";
 
-// ─── Semantic Graph Nodes & Edges ───────────────────────────────────────────
-
 export type GraphNodeCategory =
     | "GLOBAL_CONTEXT"
     | "PROJECT"
@@ -9,18 +7,58 @@ export type GraphNodeCategory =
     | "OBSERVATION"
     | "SESSION";
 
-export interface GraphNode {
+export interface GlobalContextNode {
     id: string;
-    category: GraphNodeCategory;
+    category: "GLOBAL_CONTEXT";
+    label: string;
+    metadata: { scope: "global" };
+}
+
+export interface ProjectNode {
+    id: string;
+    category: "PROJECT";
+    label: string;
+    metadata: { project: string };
+}
+
+export interface TopicNode {
+    id: string;
+    category: "TOPIC";
+    label: string;
+    metadata: { topic: string; project: string };
+}
+
+export interface ObservationNode {
+    id: string;
+    category: "OBSERVATION";
     label: string;
     lifecycle?: ObservationLifecycle;
-    status?: SessionStatus;
     type?: string;
     scope?: string;
     topic_key?: string;
     content?: string;
-    metadata?: Record<string, unknown>;
+    metadata: {
+        project: string;
+        sync_id: string;
+        created_at: string;
+        session_id?: string;
+    };
 }
+
+export interface SessionNode {
+    id: string;
+    category: "SESSION";
+    label: string;
+    status?: SessionStatus;
+    metadata: { project: string; started_at: string };
+}
+
+export type GraphNode =
+    | GlobalContextNode
+    | ProjectNode
+    | TopicNode
+    | ObservationNode
+    | SessionNode;
 
 export type GraphEdgeRelation =
     | "INHERITS"
@@ -30,13 +68,22 @@ export type GraphEdgeRelation =
     | "RELATED_TO"
     | "PRODUCED_IN";
 
-export interface GraphEdge {
+export interface StructuralEdge {
     source: string;
     target: string;
-    relation: GraphEdgeRelation;
-    reason?: string;
-    metadata?: Record<string, unknown>;
+    relation: "INHERITS" | "BELONGS_TO" | "PRODUCED_IN";
+    reason: string;
 }
+
+export interface JudgedEdge {
+    source: string;
+    target: string;
+    relation: "SUPERSEDES" | "CONFLICTS_WITH" | "RELATED_TO";
+    reason: string;
+    metadata: { relation: string; judgment_status: string };
+}
+
+export type GraphEdge = StructuralEdge | JudgedEdge;
 
 export interface SliceMetadata {
     project: string;
@@ -57,20 +104,15 @@ export interface SemanticGraph {
     slice: SliceMetadata;
 }
 
-// ─── Graph Build Options & App Configuration ────────────────────────────────
-
 export interface GraphBuildOptions {
     project?: string;
     all?: boolean;
     referenceDate?: Date;
-    globalLimit?: number | "all";
+    globalLimit?: number;
+    allGlobals?: boolean;
     includeStale?: boolean;
     includeSessions?: boolean;
     topicFilter?: string;
     typeFilter?: string[];
     isExhaustive?: boolean;
-}
-
-export interface SemanticGraphConfig {
-    category_exclusions?: string[];
 }

@@ -1,4 +1,5 @@
 import { engramHttpClient } from "./httpClient";
+import { MAX_CONFLICT_RELATIONS, DEFAULT_GLOBAL_LIMIT } from "../../config";
 import {
     ConflictPageSchema,
     EngramExportSchema,
@@ -11,40 +12,12 @@ import type {
     EngramObservation,
     EngramProjectSelection,
     EngramRelation
-} from "../../types";
+} from "./types";
 
-const MAX_CONFLICT_RELATIONS = 100_000;
+export async function getCurrentProjectName(): Promise<string> {
+    const envProjectName = process.env.ENGRAM_PROJECT?.trim();
+    if (envProjectName) return envProjectName;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Ensures pagination parameters match expected offset and limit bounds.
- */
-function assertOffsetBounds(offset: number, expectedOffset: number, pageLength: number, limit: number): void {
-    if (offset !== expectedOffset || pageLength > limit) {
-        throw new Error("Invalid /conflicts pagination offset from Engram server");
-    }
-}
-
-/**
- * Guarantees total count remains stable and no unexpected empty pages occur during pagination.
- */
-function assertSnapshotStability(total: number, expectedTotal: number, currentCount: number, pageLength: number): void {
-    const isTotalUnstable = total !== expectedTotal;
-    const isOverflowing = currentCount + pageLength > expectedTotal;
-    const isPrematureEmptyPage = pageLength === 0 && currentCount < expectedTotal;
-
-    if (isTotalUnstable || isOverflowing || isPrematureEmptyPage) {
-        throw new Error("Incomplete or changing /conflicts pagination; retry graph generation");
-    }
-}
-
-// ─── Service Operations ──────────────────────────────────────────────────────
-
-/**
- * Resolves the active project name for the caller's working directory.
- */
-export async function resolveCurrentProject(): Promise<string> {
     const rawData = await engramHttpClient.get("/project/current", { cwd: process.cwd() });
     const { project, error_hint } = parseResponse(ProjectCurrentSchema, rawData, "/project/current");
 
@@ -55,26 +28,22 @@ export async function resolveCurrentProject(): Promise<string> {
     return project;
 }
 
-/**
- * Fetches exported observations, sessions, and prompts for a specific project or all projects.
- */
 export async function fetchExport(options?: EngramProjectSelection): Promise<EngramExportPayload> {
     const params = {
-        ...(options?.allProjects && { all_projects: true }),
-        ...(!options?.allProjects && options?.project && { project: options.project }),
+        project: options?.allProjects ? undefined : options?.project,
+        all_projects: options?.allProjects || undefined,
     };
 
     const rawData = await engramHttpClient.get("/export", params);
+
     return parseResponse(EngramExportSchema, rawData, "/export");
 }
 
-/**
- * Fetches globally scoped observations across all projects, sorted by creation date descending.
- */
-export async function fetchGlobalObservations(limit = 20): Promise<EngramObservation[]> {
+export async function fetchGlobalObservations(limit = DEFAULT_GLOBAL_LIMIT): Promise<EngramObservation[]> {
     if (!Number.isSafeInteger(limit) || limit < 0) {
         throw new Error("Global observation limit must be a non-negative integer");
     }
+
     if (limit === 0) return [];
 
     const rawData = await engramHttpClient.get("/observations", {
@@ -87,40 +56,35 @@ export async function fetchGlobalObservations(limit = 20): Promise<EngramObserva
     return parseResponse(GlobalObservationsSchema, rawData, "/observations");
 }
 
-/**
- * Traverses all pages of judged relations exposed by /conflicts while validating snapshot integrity.
- */
 export async function fetchConflicts(options?: EngramProjectSelection): Promise<EngramRelation[]> {
-    const conflictsMap = new Map<string, EngramRelation>();
-    let expectedTotal: number | undefined;
+    const relations: EngramRelation[] = [];
+    let offset = 0;
 
-    while (expectedTotal === undefined || conflictsMap.size < expectedTotal) {
+    const RELATION_STATUS = "judged";
+    const CONFLICTS_PAGE_SIZE = 500;
+
+    while (true) {
         const rawData = await engramHttpClient.get("/conflicts", {
             project: options?.allProjects ? undefined : options?.project,
             all_projects: options?.allProjects || undefined,
-            status: "judged",
-            limit: 500,
-            offset: conflictsMap.size,
+            status: RELATION_STATUS,
+            limit: CONFLICTS_PAGE_SIZE,
+            offset,
         });
 
-        const { relations: page, total, limit, offset } = parseResponse(ConflictPageSchema, rawData, "/conflicts");
+        const { relations: page, total } = parseResponse(ConflictPageSchema, rawData, "/conflicts");
 
         if (total > MAX_CONFLICT_RELATIONS) {
             throw new Error(`Engram server returned too many conflict relations (maximum ${MAX_CONFLICT_RELATIONS})`);
         }
 
-        expectedTotal ??= total;
+        if (page.length === 0) break;
 
-        assertOffsetBounds(offset, conflictsMap.size, page.length, limit);
-        assertSnapshotStability(total, expectedTotal, conflictsMap.size, page.length);
+        relations.push(...page);
+        offset += page.length;
 
-        // Detect overlapping keys before inserting to ensure snapshot stability
-        if (page.some((rel) => conflictsMap.has(rel.sync_id))) {
-            throw new Error("Changing /conflicts pagination; retry graph generation");
-        }
-
-        page.forEach((rel) => conflictsMap.set(rel.sync_id, rel));
+        if (relations.length >= total) break;
     }
 
-    return Array.from(conflictsMap.values());
+    return relations;
 }

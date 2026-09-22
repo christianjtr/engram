@@ -5,7 +5,7 @@ Standalone TypeScript CLI that reads Engram memory data through the local HTTP s
 ## What It Provides
 
 - Project-scoped graphs by default, or a combined all-project graph.
-- A bounded global context: the default fetch reads up to 20 global observations and the builder includes up to 15 active observations.
+- A bounded global context: the default includes up to 15 global observations (configurable via --global-limit).
 - Filtering of deleted observations and, by default, stale observations.
 - Strict UTC lifecycle handling for `review_after`; a timestamp at or before the build reference time is stale.
 - Project, topic, observation, and optional session nodes connected with typed edges.
@@ -14,7 +14,7 @@ Standalone TypeScript CLI that reads Engram memory data through the local HTTP s
 - A deterministic `agent-context.md` projection derived from the same graph as the JSON.
 - Atomic publication of each artifact through unique temporary files and rename.
 
-The builder also supports topic and type filters, custom global limits, session nodes, and an injected reference date as a TypeScript API. These options are not exposed as CLI flags.
+The builder also supports topic and type filters, custom global limits, session nodes, and an injected reference date as a TypeScript API. --global-limit and --all-globals expose the options in the CLI.
 
 ## Requirements
 

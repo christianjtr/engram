@@ -1,8 +1,10 @@
+import { ENGRAM_SCOPES } from "./constants";
+
 /**
  * Raw Engram entity representations coming from Go HTTP endpoints.
  */
 
-export type ScopeType = "project" | "global" | "personal";
+export type ScopeType = typeof ENGRAM_SCOPES[number];
 
 export type EngramRelationType =
     | "supersedes"
@@ -16,7 +18,9 @@ export type EngramRelationType =
 export type JudgmentStatus = "pending" | "judged" | "orphaned" | "ignored" | (string & {});
 
 export interface EngramObservation {
+    /** Local SQLite AUTOINCREMENT primary key. Used only for graph node keys (`obs:${id}`). */
     id: number;
+    /** Stable UUID used for cross-machine identity and by memory_relations. */
     sync_id: string;
     session_id: string;
     type: string;
@@ -27,7 +31,7 @@ export interface EngramObservation {
     scope: ScopeType;
     topic_key?: string | null;
     revision_count: number;
-    duplicate_count?: number;
+    duplicate_count?: number | null;
     last_seen_at?: string | null;
     review_after?: string | null;
     created_at: string;
@@ -55,14 +59,16 @@ export interface EngramPrompt {
 }
 
 export interface EngramRelation {
+    id: number;
     sync_id: string;
+    relation: string;
+    judgment_status: string;
     source_id: string;
+    source_title: string;
     target_id: string;
-    relation: EngramRelationType;
-    reason?: string;
-    evidence?: string;
-    confidence?: number;
-    judgment_status: JudgmentStatus;
+    target_title: string;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface EngramExportPayload {
@@ -76,4 +82,14 @@ export interface EngramExportPayload {
 export interface EngramProjectSelection {
     project?: string;
     allProjects?: boolean;
+}
+
+export interface EngramProjectCurrent {
+    project?: string;
+    project_source?: string;
+    project_path?: string;
+    cwd?: string;
+    available_projects?: string[] | null;
+    warning?: string;
+    error_hint?: string;
 }
