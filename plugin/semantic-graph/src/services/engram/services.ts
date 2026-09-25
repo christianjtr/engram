@@ -14,15 +14,23 @@ import type {
     EngramRelation,
 } from "./types";
 
+const ENGRAM_ENDPOINTS = {
+    PROJECT_CURRENT: "/project/current",
+    EXPORT: "/export",
+    OBSERVATIONS: "/observations",
+    CONFLICTS: "/conflicts",
+} as const;
+
 export async function getCurrentProjectName(): Promise<string> {
     const envProjectName = process.env.ENGRAM_PROJECT?.trim();
     if (envProjectName) return envProjectName;
 
-    const rawData = await engramHttpClient.get("/project/current", { cwd: process.cwd() });
+    const endpoint = ENGRAM_ENDPOINTS.PROJECT_CURRENT;
+    const rawData = await engramHttpClient.get(endpoint, { cwd: process.cwd() });
     const { project, error_hint } = parseResponse(
         ProjectCurrentSchema,
         rawData,
-        "/project/current",
+        endpoint,
     );
 
     if (error_hint || !project) {
@@ -40,9 +48,10 @@ export async function fetchExport(options?: EngramProjectSelection): Promise<Eng
         all_projects: options?.allProjects || undefined,
     };
 
-    const rawData = await engramHttpClient.get("/export", params);
+    const endpoint = ENGRAM_ENDPOINTS.EXPORT;
+    const rawData = await engramHttpClient.get(endpoint, params);
 
-    return parseResponse(EngramExportSchema, rawData, "/export");
+    return parseResponse(EngramExportSchema, rawData, endpoint);
 }
 
 export async function fetchGlobalObservations(
@@ -54,14 +63,15 @@ export async function fetchGlobalObservations(
 
     if (limit === 0) return [];
 
-    const rawData = await engramHttpClient.get("/observations", {
+    const endpoint = ENGRAM_ENDPOINTS.OBSERVATIONS;
+    const rawData = await engramHttpClient.get(endpoint, {
         all_projects: true,
         scope: "global",
         limit,
         sort: "created_at:desc",
     });
 
-    return parseResponse(GlobalObservationsSchema, rawData, "/observations");
+    return parseResponse(GlobalObservationsSchema, rawData, endpoint);
 }
 
 export async function fetchConflicts(options?: EngramProjectSelection): Promise<EngramRelation[]> {
@@ -71,9 +81,10 @@ export async function fetchConflicts(options?: EngramProjectSelection): Promise<
 
     const RELATION_STATUS = "judged";
     const CONFLICTS_PAGE_SIZE = 500;
+    const endpoint = ENGRAM_ENDPOINTS.CONFLICTS;
 
     while (true) {
-        const rawData = await engramHttpClient.get("/conflicts", {
+        const rawData = await engramHttpClient.get(endpoint, {
             project: options?.allProjects ? undefined : options?.project,
             all_projects: options?.allProjects || undefined,
             status: RELATION_STATUS,
@@ -81,7 +92,7 @@ export async function fetchConflicts(options?: EngramProjectSelection): Promise<
             offset,
         });
 
-        const { relations: page, total } = parseResponse(ConflictPageSchema, rawData, "/conflicts");
+        const { relations: page, total } = parseResponse(ConflictPageSchema, rawData, endpoint);
 
         if (total > MAX_CONFLICT_RELATIONS) {
             throw new Error(
