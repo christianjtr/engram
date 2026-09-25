@@ -1,6 +1,8 @@
 import { parseCliFlags } from "./cli/parseCliFlags";
+import { assertEngramReady } from "./cli/preflight";
 import { runGenerateGraph } from "./cli/runner";
 import { DEFAULT_GLOBAL_LIMIT } from "./config";
+import { loadEnvFiles } from "./config/loadEnv";
 
 export async function main(): Promise<void> {
     const args = process.argv.slice(2);
@@ -15,24 +17,25 @@ Usage:
 
 Flags:
     -a                      Generate a consolidated graph for all projects
-    --global-limit=<n>      Limit global observations (default ${DEFAULT_GLOBAL_LIMIT})
-    --all-globals           Include all global observations
     -s                      Include stale observations
+    --globals               Include all global observations
+    --globals=<n>           Limit global observations (default ${DEFAULT_GLOBAL_LIMIT})
     -h, --help              Show this help message
 
 Examples:
     engram-semantic-graph
-    engram-semantic-graph --global-limit=20 -s
-    engram-semantic-graph --all-globals
+    engram-semantic-graph -s --globals=20
+    engram-semantic-graph --globals
     engram-semantic-graph -a
 
     (Or run without installing using 'npx engram-semantic-graph ...')
-    (To launch the web visualizer, use: npm run visualize)
 `);
         return;
     }
 
     const flags = parseCliFlags(args);
+    await loadEnvFiles();
+    await assertEngramReady();
 
     console.log("Generating graph...");
     const stats = await runGenerateGraph(flags);

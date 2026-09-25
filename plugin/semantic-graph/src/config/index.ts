@@ -3,6 +3,7 @@ import { sanitizeFilename } from "../utils/fileUtils";
 
 // ─── Plugin Operational Limits ───────────────────────────────────────────────
 export const DEFAULT_TIMEOUT_MS = 10_000;
+export const PREFLIGHT_TIMEOUT_MS = 1_500;
 export const MAX_ERROR_BODY_LENGTH = 1_000;
 export const MAX_CONFLICT_RELATIONS = 100_000;
 export const DEFAULT_GLOBAL_LIMIT = 15;
@@ -19,8 +20,7 @@ export const ENGRAM_DIR = path.join(
     "semantic-graph",
 );
 
-/** Returns the canonical filename (without extension) for a project's graph. */
-export const getSemanticGraphFilename = (projectName: string): string =>
+const getSemanticGraphFilename = (projectName: string): string =>
     `engram_semantic_graph_${sanitizeFilename(projectName)}`;
 
 /** Returns the full absolute path for a project's graph JSON file. */

@@ -101,6 +101,11 @@ export const ProjectCurrentSchema = z.object({
     error_hint: z.string().optional(),
 }) satisfies z.ZodType<EngramProjectCurrent>;
 
+export const EngramHealthSchema = z.object({
+    status: z.literal("ok"),
+    service: z.literal("engram"),
+});
+
 export const GlobalObservationsSchema = z
     .array(ObservationSchema)
     .nullish()

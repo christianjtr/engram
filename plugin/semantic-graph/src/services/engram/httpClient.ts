@@ -1,5 +1,5 @@
 import { DEFAULT_TIMEOUT_MS, MAX_ERROR_BODY_LENGTH } from "../../config";
-import { DEFAULT_ENGRAM_HOST, DEFAULT_ENGRAM_PORT } from "./constants";
+import { getEngramBaseUrl } from "./constants";
 
 interface EngramClientOptions {
     baseUrl?: string;
@@ -15,9 +15,7 @@ async function engramFetch<T>(
     params?: Record<string, string | number | boolean | undefined>,
     options?: EngramClientOptions,
 ): Promise<T> {
-    const port = process.env.ENGRAM_PORT || DEFAULT_ENGRAM_PORT;
-    const baseUrl =
-        options?.baseUrl || process.env.ENGRAM_URL || `http://${DEFAULT_ENGRAM_HOST}:${port}`;
+    const baseUrl = options?.baseUrl || getEngramBaseUrl();
     const token = options?.token ?? process.env.ENGRAM_HTTP_TOKEN;
     const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 

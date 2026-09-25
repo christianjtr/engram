@@ -26,6 +26,12 @@ export interface BuildGraphInput {
     options?: GraphBuildOptions;
 }
 
+interface GraphDraft {
+    nodesMap: Map<string, GraphNode>;
+    edges: GraphEdge[];
+    syncMap: Map<string, string>;
+}
+
 function validateBuildInput(input: BuildGraphInput, options: GraphBuildOptions): void {
     if (!input.projectName.trim()) {
         throw new Error("Graph project name must not be empty");
@@ -51,6 +57,176 @@ function createObservationFilter(topicFilter: string | undefined, typeFilter: Se
     };
 }
 
+function isNonDeleted(obs: EngramObservation): boolean {
+    return obs.deleted_at == null || obs.deleted_at.trim() === "";
+}
+
+function resolveProject(
+    observation: Pick<EngramObservation, "project" | "session_id">,
+    sessionsById: Map<string, EngramSession>,
+    fallbackProject: string,
+): string {
+    return (
+        observation.project || sessionsById.get(observation.session_id)?.project || fallbackProject
+    );
+}
+
+function makeTopicNodeId(rawTopic: string, project: string, isAllProjects: boolean): string {
+    return isAllProjects
+        ? `topic:${encodeURIComponent(JSON.stringify([project, rawTopic]))}`
+        : `topic:${rawTopic}`;
+}
+
+function selectGlobalObservations(
+    observations: EngramObservation[],
+    matchesFilters: (obs: Pick<EngramObservation, "topic_key" | "type">) => boolean,
+    includeStale: boolean,
+    referenceDate: Date,
+    allGlobals: boolean | undefined,
+    globalLimit: number | undefined,
+): EngramObservation[] {
+    const processed = observations.filter((obs) => {
+        if (!matchesFilters(obs)) return false;
+        return (
+            includeStale ||
+            calculateObservationLifecycle(obs.review_after, referenceDate) === "active"
+        );
+    });
+    return allGlobals ? processed : processed.slice(0, globalLimit ?? DEFAULT_GLOBAL_LIMIT);
+}
+
+function addProjectObservations(
+    observations: EngramObservation[],
+    draft: GraphDraft,
+    params: {
+        matchesFilters: (obs: Pick<EngramObservation, "topic_key" | "type">) => boolean;
+        includeStale: boolean;
+        referenceDate: Date;
+        sessionsById: Map<string, EngramSession>;
+        fallbackProject: string;
+        isAllProjects: boolean;
+    },
+): {
+    included: EngramObservation[];
+    activeCount: number;
+    staleCount: number;
+    topicsCount: number;
+} {
+    const topicNodesCreated = new Set<string>();
+    const included: EngramObservation[] = [];
+    let activeCount = 0;
+    let staleCount = 0;
+
+    for (const observation of observations) {
+        if (!params.matchesFilters(observation)) continue;
+
+        const lifecycle = calculateObservationLifecycle(
+            observation.review_after,
+            params.referenceDate,
+        );
+        if (lifecycle === "active") activeCount++;
+        if (lifecycle === "stale") staleCount++;
+        if (!params.includeStale && lifecycle === "stale") continue;
+
+        included.push(observation);
+
+        const project = resolveProject(observation, params.sessionsById, params.fallbackProject);
+        const projectRootId = ensureProjectNode(draft.nodesMap, draft.edges, project);
+        const rawTopic = normalizeTopicKey(observation.topic_key);
+        const topicNodeId = makeTopicNodeId(rawTopic, project, params.isAllProjects);
+
+        if (!topicNodesCreated.has(topicNodeId)) {
+            topicNodesCreated.add(topicNodeId);
+            draft.nodesMap.set(topicNodeId, {
+                id: topicNodeId,
+                category: "TOPIC",
+                label: `TOPIC: ${rawTopic}`,
+                metadata: { topic: rawTopic, project },
+            });
+            draft.edges.push({
+                source: topicNodeId,
+                target: projectRootId,
+                relation: "BELONGS_TO",
+                reason: "Project topic",
+            });
+        }
+
+        const observationNodeId = `obs:${observation.id}`;
+        if (observation.sync_id) draft.syncMap.set(observation.sync_id, observationNodeId);
+
+        draft.nodesMap.set(observationNodeId, {
+            id: observationNodeId,
+            category: "OBSERVATION",
+            label: observation.title,
+            lifecycle,
+            type: normalizeObservationType(observation.type),
+            scope: observation.scope,
+            topic_key: rawTopic,
+            content: observation.content,
+            metadata: {
+                project,
+                sync_id: observation.sync_id,
+                session_id: observation.session_id,
+                created_at: observation.created_at,
+            },
+        });
+
+        draft.edges.push({
+            source: observationNodeId,
+            target: topicNodeId,
+            relation: "BELONGS_TO",
+            reason: "Topic membership",
+        });
+    }
+
+    return { included, activeCount, staleCount, topicsCount: topicNodesCreated.size };
+}
+
+function addSessionNodes(
+    sessions: EngramSession[],
+    includedObservations: EngramObservation[],
+    draft: GraphDraft,
+    fallbackProject: string,
+): void {
+    for (const session of sessions) {
+        const sessionNodeId = `session:${session.id}`;
+        const projectRootId = ensureProjectNode(
+            draft.nodesMap,
+            draft.edges,
+            session.project || fallbackProject,
+        );
+
+        draft.nodesMap.set(sessionNodeId, {
+            id: sessionNodeId,
+            category: "SESSION",
+            label: `Session ${session.id.slice(0, 8)}`,
+            status: calculateSessionStatus(session),
+            metadata: { project: session.project, started_at: session.started_at },
+        });
+
+        draft.edges.push({
+            source: sessionNodeId,
+            target: projectRootId,
+            relation: "BELONGS_TO",
+            reason: "Work session",
+        });
+    }
+
+    for (const observation of includedObservations) {
+        if (!observation.session_id) continue;
+        const sessionNodeId = `session:${observation.session_id}`;
+        const observationNodeId = `obs:${observation.id}`;
+        if (draft.nodesMap.has(sessionNodeId) && draft.nodesMap.has(observationNodeId)) {
+            draft.edges.push({
+                source: observationNodeId,
+                target: sessionNodeId,
+                relation: "PRODUCED_IN",
+                reason: "Recorded during session",
+            });
+        }
+    }
+}
+
 export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
     const {
         projectName,
@@ -74,8 +250,6 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
     const includeStale = options.includeStale ?? false;
     const matchesFilters = createObservationFilter(topicFilter, typeFilter);
 
-    const isNonDeleted = (obs: EngramObservation) =>
-        obs.deleted_at == null || obs.deleted_at.trim() === "";
     const validObservations = inputObservations.filter(
         (obs) => isNonDeleted(obs) && obs.scope !== "global",
     );
@@ -85,12 +259,13 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
     const globalSessionsById = new Map(globalSessions.map((session) => [session.id, session]));
     const sessionsById = new Map(sessions.map((session) => [session.id, session]));
 
-    const nodesMap = new Map<string, GraphNode>();
-    const edges: GraphEdge[] = [];
-    const syncMap = new Map<string, string>();
-    const topicNodesCreated = new Set<string>();
+    const draft: GraphDraft = {
+        nodesMap: new Map<string, GraphNode>(),
+        edges: [],
+        syncMap: new Map<string, string>(),
+    };
 
-    nodesMap.set(GLOBAL_ROOT_ID, {
+    draft.nodesMap.set(GLOBAL_ROOT_ID, {
         id: GLOBAL_ROOT_ID,
         category: "GLOBAL_CONTEXT",
         label: "GLOBAL CONTEXT",
@@ -98,20 +273,17 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
     });
 
     if (!isAllProjects) {
-        ensureProjectNode(nodesMap, edges, projectName);
+        ensureProjectNode(draft.nodesMap, draft.edges, projectName);
     }
 
-    const processedGlobals = validGlobals.filter((obs) => {
-        if (!matchesFilters(obs)) return false;
-        return (
-            includeStale ||
-            calculateObservationLifecycle(obs.review_after, referenceDate) === "active"
-        );
-    });
-
-    const selectedGlobals = options.allGlobals
-        ? processedGlobals
-        : processedGlobals.slice(0, options.globalLimit ?? DEFAULT_GLOBAL_LIMIT);
+    const selectedGlobals = selectGlobalObservations(
+        validGlobals,
+        matchesFilters,
+        includeStale,
+        referenceDate,
+        options.allGlobals,
+        options.globalLimit,
+    );
 
     const globalResult = buildGlobalObservationNodes(
         selectedGlobals,
@@ -120,129 +292,37 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
         referenceDate,
     );
     for (const node of globalResult.nodes) {
-        nodesMap.set(node.id, node);
+        draft.nodesMap.set(node.id, node);
     }
-    edges.push(...globalResult.edges);
+    draft.edges.push(...globalResult.edges);
     for (const [syncId, id] of globalResult.syncMap) {
-        syncMap.set(syncId, id);
+        draft.syncMap.set(syncId, id);
     }
 
-    let activeCount = 0;
-    let staleCount = 0;
-
-    const includedObservations: EngramObservation[] = [];
-
-    for (const observation of validObservations) {
-        if (!matchesFilters(observation)) continue;
-
-        const lifecycle = calculateObservationLifecycle(observation.review_after, referenceDate);
-        if (lifecycle === "active") activeCount++;
-        if (lifecycle === "stale") staleCount++;
-        if (!includeStale && lifecycle === "stale") continue;
-
-        includedObservations.push(observation);
-
-        const project =
-            observation.project ||
-            sessionsById.get(observation.session_id)?.project ||
-            fallbackProject;
-        const projectRootId = ensureProjectNode(nodesMap, edges, project);
-        const rawTopic = normalizeTopicKey(observation.topic_key);
-        const topicNodeId = isAllProjects
-            ? `topic:${encodeURIComponent(JSON.stringify([project, rawTopic]))}`
-            : `topic:${rawTopic}`;
-
-        if (!topicNodesCreated.has(topicNodeId)) {
-            topicNodesCreated.add(topicNodeId);
-            nodesMap.set(topicNodeId, {
-                id: topicNodeId,
-                category: "TOPIC",
-                label: `TOPIC: ${rawTopic}`,
-                metadata: { topic: rawTopic, project },
-            });
-            edges.push({
-                source: topicNodeId,
-                target: projectRootId,
-                relation: "BELONGS_TO",
-                reason: "Project topic",
-            });
-        }
-
-        const observationNodeId = `obs:${observation.id}`;
-        if (observation.sync_id) syncMap.set(observation.sync_id, observationNodeId);
-
-        nodesMap.set(observationNodeId, {
-            id: observationNodeId,
-            category: "OBSERVATION",
-            label: observation.title,
-            lifecycle,
-            type: normalizeObservationType(observation.type),
-            scope: observation.scope,
-            topic_key: rawTopic,
-            content: observation.content,
-            metadata: {
-                project,
-                sync_id: observation.sync_id,
-                session_id: observation.session_id,
-                created_at: observation.created_at,
-            },
-        });
-
-        edges.push({
-            source: observationNodeId,
-            target: topicNodeId,
-            relation: "BELONGS_TO",
-            reason: "Topic membership",
-        });
-    }
+    const { included, activeCount, staleCount, topicsCount } = addProjectObservations(
+        validObservations,
+        draft,
+        {
+            matchesFilters,
+            includeStale,
+            referenceDate,
+            sessionsById,
+            fallbackProject,
+            isAllProjects,
+        },
+    );
 
     if (options.includeSessions) {
-        for (const session of sessions) {
-            const sessionNodeId = `session:${session.id}`;
-            const projectRootId = ensureProjectNode(
-                nodesMap,
-                edges,
-                session.project || fallbackProject,
-            );
-
-            nodesMap.set(sessionNodeId, {
-                id: sessionNodeId,
-                category: "SESSION",
-                label: `Session ${session.id.slice(0, 8)}`,
-                status: calculateSessionStatus(session),
-                metadata: { project: session.project, started_at: session.started_at },
-            });
-
-            edges.push({
-                source: sessionNodeId,
-                target: projectRootId,
-                relation: "BELONGS_TO",
-                reason: "Work session",
-            });
-        }
-
-        for (const observation of includedObservations) {
-            if (!observation.session_id) continue;
-            const sessionNodeId = `session:${observation.session_id}`;
-            const observationNodeId = `obs:${observation.id}`;
-            if (nodesMap.has(sessionNodeId) && nodesMap.has(observationNodeId)) {
-                edges.push({
-                    source: observationNodeId,
-                    target: sessionNodeId,
-                    relation: "PRODUCED_IN",
-                    reason: "Recorded during session",
-                });
-            }
-        }
+        addSessionNodes(sessions, included, draft, fallbackProject);
     }
 
-    edges.push(...buildRelationEdges(relations, syncMap));
+    draft.edges.push(...buildRelationEdges(relations, draft.syncMap));
 
-    const nodesArray = Array.from(nodesMap.values());
+    const nodesArray = Array.from(draft.nodesMap.values());
 
     return {
         nodes: nodesArray,
-        edges,
+        edges: draft.edges,
         types: collectTypeMetadata(nodesArray),
         slice: {
             project: projectName,
@@ -251,7 +331,7 @@ export function buildSemanticGraph(input: BuildGraphInput): SemanticGraph {
             staleCount,
             globalRulesInherited: selectedGlobals.length,
             globalRulesTotal: validGlobals.length,
-            topicsCount: topicNodesCreated.size,
+            topicsCount,
             isExhaustive: Boolean(options.isExhaustive),
             generatedAt: referenceDate.toISOString(),
         },

@@ -1,5 +1,11 @@
 import type { EngramObservation, EngramRelation, EngramSession } from "../../services/engram/types";
-import type { GraphEdge, GraphEdgeRelation, GraphNode, TypeMetadata } from "../../types";
+import type {
+    GraphEdge,
+    GraphEdgeRelation,
+    GraphNode,
+    GraphNodeCategory,
+    TypeMetadata,
+} from "../../types";
 import {
     calculateObservationLifecycle,
     isConventionLike,
@@ -109,10 +115,19 @@ export function buildRelationEdges(
     return edges;
 }
 
+function nodesByCategory<C extends GraphNodeCategory>(
+    nodes: GraphNode[],
+    category: C,
+): Extract<GraphNode, { category: C }>[] {
+    return nodes.filter(
+        (node): node is Extract<GraphNode, { category: C }> => node.category === category,
+    );
+}
+
 export function collectTypeMetadata(nodes: GraphNode[]): Record<string, TypeMetadata> {
     const catalog: Record<string, TypeMetadata> = {};
-    for (const node of nodes) {
-        if (node.category === "OBSERVATION" && node.type && !catalog[node.type]) {
+    for (const node of nodesByCategory(nodes, "OBSERVATION")) {
+        if (node.type && !catalog[node.type]) {
             catalog[node.type] = {
                 type: node.type,
                 label: node.type.toUpperCase(),

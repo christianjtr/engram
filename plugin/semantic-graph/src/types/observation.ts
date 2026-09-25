@@ -17,14 +17,10 @@ export const STANDARD_OBSERVATION_TYPES = [
 ] as const;
 
 export type StandardObservationType = (typeof STANDARD_OBSERVATION_TYPES)[number];
-
-/**
- * Open union for standard types with full autocomplete support while accepting custom types.
- */
 export type ObservationType = StandardObservationType | (string & {});
 
 export interface TypeMetadata {
-    type: string;
-    label: string; // Clean uppercase badge (e.g. "CONVENTION", "DECISION")
-    isConventionLike: boolean; // Indicates rules, constraints, and architecture decisions
+    type: ObservationType;
+    label: string;
+    isConventionLike: boolean;
 }

@@ -5,14 +5,38 @@ export interface CliFlags {
     allGlobals?: boolean;
 }
 
-const VALID_FLAGS = new Set(["-a", "-s", "-h", "--help", "--all-globals"]);
+const VALID_FLAGS = new Set(["-a", "-s", "-h", "--help", "--globals"]);
 
 export function parseCliFlags(args: string[]): CliFlags {
     const seen = new Set<string>();
+    let hasAllGlobals = false;
+    let limitArg: string | undefined;
 
     for (const arg of args) {
         if (!arg.startsWith("-")) {
             throw new Error(`Unexpected positional argument: ${arg}`);
+        }
+
+        if (arg === "--globals") {
+            if (limitArg) {
+                throw new Error("--globals and --globals=<n> cannot be used together");
+            }
+            if (hasAllGlobals) {
+                throw new Error("Duplicate flag: --globals");
+            }
+            hasAllGlobals = true;
+            continue;
+        }
+
+        if (arg.startsWith("--globals=")) {
+            if (hasAllGlobals) {
+                throw new Error("--globals and --globals=<n> cannot be used together");
+            }
+            if (limitArg) {
+                throw new Error("Duplicate flag: --globals");
+            }
+            limitArg = arg;
+            continue;
         }
 
         if (seen.has(arg)) {
@@ -20,33 +44,18 @@ export function parseCliFlags(args: string[]): CliFlags {
         }
         seen.add(arg);
 
-        if (arg === "--global-limit") {
-            throw new Error("Missing value for --global-limit. Use --global-limit=<number>");
-        }
-
-        if (arg.startsWith("--global-limit=")) {
-            continue;
-        }
-
         if (!VALID_FLAGS.has(arg)) {
             throw new Error(`Unknown flag: ${arg}`);
         }
     }
 
-    const hasAllGlobals = args.includes("--all-globals");
-    const limitArg = args.find((a) => a.startsWith("--global-limit="));
-
-    if (hasAllGlobals && limitArg) {
-        throw new Error("--all-globals and --global-limit cannot be used together");
-    }
-
     let globalLimit: number | undefined;
     if (limitArg) {
-        const val = limitArg.slice("--global-limit=".length).trim();
+        const val = limitArg.slice("--globals=".length).trim();
         const num = Number(val);
 
         if (!val || !Number.isSafeInteger(num) || num < 0) {
-            throw new Error("Invalid value for --global-limit: must be a non-negative integer");
+            throw new Error("Invalid value for --globals: must be a non-negative integer");
         }
         globalLimit = num;
     }

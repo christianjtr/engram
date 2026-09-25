@@ -1,12 +1,26 @@
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import utc from "dayjs/plugin/utc";
-import type { ObservationLifecycle, SessionStatus } from "../../types";
+import {
+    type ObservationLifecycle,
+    type ObservationType,
+    type SessionStatus,
+    STANDARD_OBSERVATION_TYPES,
+    type StandardObservationType,
+} from "../../types";
 
 dayjs.extend(utc);
 dayjs.extend(customParseFormat);
 
-const CONVENTION_TYPES = new Set(["convention", "decision", "architecture", "pattern"]);
+const CONVENTION_LIKE_TYPES = new Set<string>(
+    STANDARD_OBSERVATION_TYPES.filter(
+        (type: StandardObservationType) =>
+            type === "convention" ||
+            type === "decision" ||
+            type === "architecture" ||
+            type === "pattern",
+    ),
+);
 const REVIEW_FORMATS = [
     "YYYY-MM-DD HH:mm:ss",
     "YYYY-MM-DDTHH:mm:ssZ",
@@ -14,8 +28,8 @@ const REVIEW_FORMATS = [
     "YYYY-MM-DD",
 ];
 
-export function normalizeObservationType(rawType?: string | null): string {
-    return rawType?.trim().toLowerCase() || "other";
+export function normalizeObservationType(rawType?: string | null): ObservationType {
+    return (rawType?.trim().toLowerCase() || "other") as ObservationType;
 }
 
 export function normalizeTopicKey(topicKey?: string | null): string {
@@ -23,7 +37,7 @@ export function normalizeTopicKey(topicKey?: string | null): string {
 }
 
 export function isConventionLike(type?: string | null): boolean {
-    return CONVENTION_TYPES.has(normalizeObservationType(type));
+    return CONVENTION_LIKE_TYPES.has(normalizeObservationType(type));
 }
 
 export function calculateObservationLifecycle(

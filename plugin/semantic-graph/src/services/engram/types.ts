@@ -61,8 +61,8 @@ export interface EngramPrompt {
 export interface EngramRelation {
     id: number;
     sync_id: string;
-    relation: string;
-    judgment_status: string;
+    relation: EngramRelationType;
+    judgment_status: JudgmentStatus;
     source_id: string;
     source_title: string;
     target_id: string;

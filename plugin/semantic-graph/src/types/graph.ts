@@ -1,6 +1,9 @@
-import type { ObservationLifecycle, SessionStatus, TypeMetadata } from "./observation";
-
-export type GraphNodeCategory = "GLOBAL_CONTEXT" | "PROJECT" | "TOPIC" | "OBSERVATION" | "SESSION";
+import type {
+    ObservationLifecycle,
+    ObservationType,
+    SessionStatus,
+    TypeMetadata,
+} from "./observation";
 
 export interface GlobalContextNode {
     id: string;
@@ -28,7 +31,7 @@ export interface ObservationNode {
     category: "OBSERVATION";
     label: string;
     lifecycle?: ObservationLifecycle;
-    type?: string;
+    type?: ObservationType;
     scope?: string;
     topic_key?: string;
     content?: string;
@@ -49,6 +52,7 @@ export interface SessionNode {
 }
 
 export type GraphNode = GlobalContextNode | ProjectNode | TopicNode | ObservationNode | SessionNode;
+export type GraphNodeCategory = GraphNode["category"];
 
 export type GraphEdgeRelation =
     | "INHERITS"

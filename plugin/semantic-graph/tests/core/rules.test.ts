@@ -7,6 +7,7 @@ import {
     normalizeObservationType,
     normalizeTopicKey,
 } from "../../src/core/graph/rules";
+import { STANDARD_OBSERVATION_TYPES } from "../../src/types";
 
 test("normalizeObservationType normalizes type string", () => {
     assert.equal(normalizeObservationType("  CONVENTION "), "convention");
@@ -31,6 +32,18 @@ test("isConventionLike detects convention-like types", () => {
     assert.equal(isConventionLike("bugfix"), false);
     assert.equal(isConventionLike("learning"), false);
     assert.equal(isConventionLike("discovery"), false);
+});
+
+test("STANDARD_OBSERVATION_TYPES is the catalog for convention-like types", () => {
+    for (const type of STANDARD_OBSERVATION_TYPES) {
+        const expected =
+            type === "convention" ||
+            type === "decision" ||
+            type === "architecture" ||
+            type === "pattern";
+        assert.equal(isConventionLike(type), expected);
+    }
+    assert.equal(isConventionLike("custom-type"), false);
 });
 
 test("calculateObservationLifecycle evaluates UTC lifecycle correctly", () => {

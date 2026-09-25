@@ -19,37 +19,40 @@ test("parseCliFlags parses short flags", () => {
     assert.equal(flags.allGlobals, false);
 });
 
-test("parseCliFlags parses --global-limit=<n>", () => {
-    const flags = parseCliFlags(["--global-limit=25"]);
+test("parseCliFlags parses --globals=<n>", () => {
+    const flags = parseCliFlags(["--globals=25"]);
     assert.equal(flags.globalLimit, 25);
     assert.equal(flags.all, false);
+    assert.equal(flags.allGlobals, false);
 });
 
-test("parseCliFlags parses --all-globals", () => {
-    const flags = parseCliFlags(["--all-globals"]);
+test("parseCliFlags parses --globals", () => {
+    const flags = parseCliFlags(["--globals"]);
     assert.equal(flags.allGlobals, true);
     assert.equal(flags.globalLimit, undefined);
 });
 
-test("parseCliFlags throws on --global-limit without value", () => {
-    assert.throws(() => parseCliFlags(["--global-limit"]), /Missing value for --global-limit/);
+test("parseCliFlags throws on invalid --globals value", () => {
+    assert.throws(() => parseCliFlags(["--globals=abc"]), /Invalid value for --globals/);
+    assert.throws(() => parseCliFlags(["--globals=-5"]), /Invalid value for --globals/);
+    assert.throws(() => parseCliFlags(["--globals="]), /Invalid value for --globals/);
 });
 
-test("parseCliFlags throws on invalid --global-limit value", () => {
-    assert.throws(() => parseCliFlags(["--global-limit=abc"]), /Invalid value for --global-limit/);
-    assert.throws(() => parseCliFlags(["--global-limit=-5"]), /Invalid value for --global-limit/);
-});
-
-test("parseCliFlags throws when combining --all-globals and --global-limit", () => {
+test("parseCliFlags throws when combining --globals and --globals=<n>", () => {
     assert.throws(
-        () => parseCliFlags(["--all-globals", "--global-limit=10"]),
-        /--all-globals and --global-limit cannot be used together/,
+        () => parseCliFlags(["--globals", "--globals=10"]),
+        /--globals and --globals=<n> cannot be used together/,
+    );
+    assert.throws(
+        () => parseCliFlags(["--globals=10", "--globals"]),
+        /--globals and --globals=<n> cannot be used together/,
     );
 });
 
 test("parseCliFlags throws on duplicate flags", () => {
     assert.throws(() => parseCliFlags(["-a", "-a"]), /Duplicate flag: -a/);
     assert.throws(() => parseCliFlags(["-s", "-s"]), /Duplicate flag: -s/);
+    assert.throws(() => parseCliFlags(["--globals", "--globals"]), /Duplicate flag: --globals/);
 });
 
 test("parseCliFlags throws on unexpected positional arguments", () => {
@@ -62,4 +65,6 @@ test("parseCliFlags throws on unexpected positional arguments", () => {
 test("parseCliFlags throws on unknown short or long flags", () => {
     assert.throws(() => parseCliFlags(["-x"]), /Unknown flag: -x/);
     assert.throws(() => parseCliFlags(["--unknown-flag"]), /Unknown flag: --unknown-flag/);
+    assert.throws(() => parseCliFlags(["--all-globals"]), /Unknown flag: --all-globals/);
+    assert.throws(() => parseCliFlags(["--global-limit=10"]), /Unknown flag: --global-limit=10/);
 });
