@@ -17,8 +17,6 @@
         "build": "npm run clean && node esbuild.config.mjs",
         "dev": "node esbuild.config.mjs --watch",
         "start": "node dist/semantic-graph.js",
-        "generate": "node dist/semantic-graph.js",
-        "visualize": "tsx src/visualizer/server.ts",
         "typecheck": "tsc --noEmit",
         "lint": "biome check .",
         "lint:fix": "biome check --write .",

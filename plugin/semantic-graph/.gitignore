@@ -15,6 +15,9 @@ build/
 # We must never commit the user's private tokens, configs, or local maps
 graph-config.json
 knowledge_graph.json
+.env
+.env.*
+!.env.example
 
 # 4. Log Files
 npm-debug.log*

@@ -5,15 +5,13 @@ Standalone TypeScript CLI that reads Engram memory data through the local HTTP s
 ## What It Provides
 
 - Project-scoped graphs by default, or a combined all-project graph.
-- A bounded global context: the default includes up to 15 global observations (configurable via --global-limit).
+- A bounded global context: the default includes up to 15 global observations (configurable via `--globals=<n>`).
 - Filtering of deleted observations and, by default, stale observations.
 - Strict UTC lifecycle handling for `review_after`; a timestamp at or before the build reference time is stale.
 - Project, topic, observation, and optional session nodes connected with typed edges.
 - Persisted judged relations from `/conflicts`, including `SUPERSEDES`, `CONFLICTS_WITH`, or `RELATED_TO` edges when both endpoints are present.
 - Schema validation for HTTP responses with Zod.
 - Atomic publication through unique temporary files and rename.
-
-The builder also supports topic and type filters, custom global limits, session nodes, and an injected reference date as a TypeScript API. --global-limit and --all-globals expose the options in the CLI.
 
 ## Requirements
 
@@ -27,7 +25,7 @@ Start the local server:
 engram serve
 ```
 
-The default server URL is `http://127.0.0.1:7437`.
+The default server URL is `http://127.0.0.1:7437`. Before generating a graph the CLI probes `GET /health` and requires `{ "status": "ok", "service": "engram" }`. `--help` skips this check.
 
 ## Build and Run
 
@@ -41,35 +39,29 @@ The production bundle is written to `dist/semantic-graph.js`.
 
 The CLI is intentionally non-interactive. Every invocation either prints help or generates a graph.
 
-### Short CLI flags
+### CLI flags
 
-Only the short flags below are supported:
+| Flag            | Meaning                                              |
+| --------------- | ---------------------------------------------------- |
+| _(none)_        | Current project, 15 globals, stale observations off  |
+| `-a`            | Generate one graph containing all projects           |
+| `-s`            | Include stale observations                           |
+| `--globals`     | Include all global observations                      |
+| `--globals=<n>` | Limit global observations                            |
+| `-h`, `--help`  | Print help (skips env loading and the health probe)  |
 
-| Flag                  | Meaning                                    |
-| --------------------- | ------------------------------------------ |
-| `-a`                  | Generate one graph containing all projects |
-| `-s`                  | Include stale observations                 |
-| `--global-limit=<n>`  | Limit number of global observations        |
-| `--all-globals`       | Include all global observations            |
-| `-h`                  | Print help                                 |
+`--globals` and `--globals=<n>` cannot be combined.
 
 Examples:
 
 ```bash
-# Current project (default)
 npm start
-
-# Current project, including stale observations
-node dist/semantic-graph.js -s
-
-# All projects
-node dist/semantic-graph.js -a
-
-# Package shortcut
-npm run generate
+npm start -- -s --globals=20
+npm start -- --globals
+npm start -- -a
 ```
 
-Running without arguments generates the current-project graph. `-a` cannot be combined with explicit project selection. Unknown, duplicate, and positional arguments are rejected.
+Unknown, duplicate, and positional arguments are rejected.
 
 ## Project Resolution
 
@@ -90,7 +82,15 @@ The server may apply its own project resolver policy.
 | `ENGRAM_HTTP_TOKEN` | unset                   | Bearer token for authenticated requests |
 | `ENGRAM_PROJECT`    | unset                   | Project override used during discovery  |
 
-Requests use a 10-second timeout by default. Keep the server on loopback, or use HTTPS before configuring a remote URL with an authentication token.
+Values are read in this order (first set wins):
+
+1. Process environment
+2. `.env` in the current working directory
+3. `~/.engram/semantic-graph/.env`
+
+Copy `.env.example` to either location. Only the variables above are applied; unknown keys are ignored.
+
+Requests use a 10-second timeout by default. The pre-flight health probe uses a 1.5-second timeout. Keep the server on loopback, or use HTTPS before configuring a remote URL with an authentication token. If the daemon is down, the CLI exits and tells you to run `engram serve`.
 
 ## Output
 
@@ -223,22 +223,20 @@ src/
 ├── types/                # Graph, observation, and Engram entity types
 ├── services/engram/      # HTTP boundary and response schemas
 ├── core/                 # Graph assembly and semantic rules
-├── cli/                  # CLI entry actions and graph generation
-├── config/               # Snapshot paths and filename helpers
+├── cli/                  # CLI flags, preflight, and graph generation
+├── config/               # Snapshot paths, env loader, and limits
 ├── utils/                # Filesystem helpers
-├── visualizer/           # Local web visualizer server and UI
-└── index.ts              # CLI entry point and short-flag parser
+└── index.ts              # CLI entry point
 ```
 
 ## Validation
 
 ```bash
 npm run typecheck
-npm run build
+npm run lint
 npm test
+npm run build
 ```
-
-The package has the `npm test` command configured for `tests/**/*.test.ts`; the dedicated TypeScript test suite is still being built. Current validation for this feature is provided by typecheck, production build, and manual CLI/server smoke tests.
 
 ## Planned Extensions
 
