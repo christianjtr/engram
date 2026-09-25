@@ -54,9 +54,18 @@ const PromptSchema = z.object({
 export const EngramExportSchema = z.object({
     version: z.string(),
     exported_at: z.string(),
-    observations: z.array(ObservationSchema).nullish().transform((val) => val ?? []),
-    sessions: z.array(SessionSchema).nullish().transform((val) => val ?? []),
-    prompts: z.array(PromptSchema).nullish().transform((val) => val ?? []),
+    observations: z
+        .array(ObservationSchema)
+        .nullish()
+        .transform((val) => val ?? []),
+    sessions: z
+        .array(SessionSchema)
+        .nullish()
+        .transform((val) => val ?? []),
+    prompts: z
+        .array(PromptSchema)
+        .nullish()
+        .transform((val) => val ?? []),
 }) satisfies z.ZodType<EngramExportPayload>;
 
 const JudgedRelationSchema = z.object({
@@ -73,7 +82,10 @@ const JudgedRelationSchema = z.object({
 }) satisfies z.ZodType<EngramRelation>;
 
 export const ConflictPageSchema = z.object({
-    relations: z.array(JudgedRelationSchema).nullish().transform((val) => val ?? []),
+    relations: z
+        .array(JudgedRelationSchema)
+        .nullish()
+        .transform((val) => val ?? []),
     total: z.number().int().nonnegative(),
     limit: z.number().int().positive(),
     offset: z.number().int().nonnegative(),
@@ -89,7 +101,10 @@ export const ProjectCurrentSchema = z.object({
     error_hint: z.string().optional(),
 }) satisfies z.ZodType<EngramProjectCurrent>;
 
-export const GlobalObservationsSchema = z.array(ObservationSchema).nullish().transform((val) => val ?? []) satisfies z.ZodType<EngramObservation[]>;
+export const GlobalObservationsSchema = z
+    .array(ObservationSchema)
+    .nullish()
+    .transform((val) => val ?? []) satisfies z.ZodType<EngramObservation[]>;
 
 export function parseResponse<T>(schema: z.ZodType<T>, rawData: unknown, context: string): T {
     const parsed = schema.safeParse(rawData);

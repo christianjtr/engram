@@ -1,6 +1,6 @@
 # Engram Semantic Graph
 
-Standalone TypeScript CLI that reads Engram memory data through the local HTTP server and writes two derived snapshots: a complete semantic graph as JSON and a compact agent context as Markdown. Engram remains the source of truth: this package does not access SQLite, mutate memories, judge conflicts, or run synchronization.
+Standalone TypeScript CLI that reads Engram memory data through the local HTTP server and writes a complete semantic graph snapshot as JSON. Engram remains the source of truth: this package does not access SQLite, mutate memories, judge conflicts, or run synchronization.
 
 ## What It Provides
 
@@ -39,7 +39,7 @@ npm run build
 
 The production bundle is written to `dist/semantic-graph.js`.
 
-The CLI is intentionally non-interactive. Every invocation either prints help or generates a graph and its companion agent context.
+The CLI is intentionally non-interactive. Every invocation either prints help or generates a graph.
 
 ### Short CLI flags
 

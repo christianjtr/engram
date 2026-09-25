@@ -25,6 +25,6 @@ export type ObservationType = StandardObservationType | (string & {});
 
 export interface TypeMetadata {
     type: string;
-    label: string;             // Clean uppercase badge (e.g. "CONVENTION", "DECISION")
+    label: string; // Clean uppercase badge (e.g. "CONVENTION", "DECISION")
     isConventionLike: boolean; // Indicates rules, constraints, and architecture decisions
 }

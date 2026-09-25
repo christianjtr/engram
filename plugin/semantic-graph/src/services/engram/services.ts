@@ -1,17 +1,17 @@
+import { DEFAULT_GLOBAL_LIMIT, MAX_CONFLICT_RELATIONS } from "../../config";
 import { engramHttpClient } from "./httpClient";
-import { MAX_CONFLICT_RELATIONS, DEFAULT_GLOBAL_LIMIT } from "../../config";
 import {
     ConflictPageSchema,
     EngramExportSchema,
     GlobalObservationsSchema,
     ProjectCurrentSchema,
-    parseResponse
+    parseResponse,
 } from "./schemas";
 import type {
     EngramExportPayload,
     EngramObservation,
     EngramProjectSelection,
-    EngramRelation
+    EngramRelation,
 } from "./types";
 
 export async function getCurrentProjectName(): Promise<string> {
@@ -19,10 +19,16 @@ export async function getCurrentProjectName(): Promise<string> {
     if (envProjectName) return envProjectName;
 
     const rawData = await engramHttpClient.get("/project/current", { cwd: process.cwd() });
-    const { project, error_hint } = parseResponse(ProjectCurrentSchema, rawData, "/project/current");
+    const { project, error_hint } = parseResponse(
+        ProjectCurrentSchema,
+        rawData,
+        "/project/current",
+    );
 
     if (error_hint || !project) {
-        throw new Error(`Project discovery failed: ${error_hint || "no project resolved"}. Use -p <name>.`);
+        throw new Error(
+            `Project discovery failed: ${error_hint || "no project resolved"}. Set ENGRAM_PROJECT or run from a project directory.`,
+        );
     }
 
     return project;
@@ -39,7 +45,9 @@ export async function fetchExport(options?: EngramProjectSelection): Promise<Eng
     return parseResponse(EngramExportSchema, rawData, "/export");
 }
 
-export async function fetchGlobalObservations(limit = DEFAULT_GLOBAL_LIMIT): Promise<EngramObservation[]> {
+export async function fetchGlobalObservations(
+    limit = DEFAULT_GLOBAL_LIMIT,
+): Promise<EngramObservation[]> {
     if (!Number.isSafeInteger(limit) || limit < 0) {
         throw new Error("Global observation limit must be a non-negative integer");
     }
@@ -59,6 +67,7 @@ export async function fetchGlobalObservations(limit = DEFAULT_GLOBAL_LIMIT): Pro
 export async function fetchConflicts(options?: EngramProjectSelection): Promise<EngramRelation[]> {
     const relations: EngramRelation[] = [];
     let offset = 0;
+    let initialTotal: number | undefined;
 
     const RELATION_STATUS = "judged";
     const CONFLICTS_PAGE_SIZE = 500;
@@ -75,10 +84,25 @@ export async function fetchConflicts(options?: EngramProjectSelection): Promise<
         const { relations: page, total } = parseResponse(ConflictPageSchema, rawData, "/conflicts");
 
         if (total > MAX_CONFLICT_RELATIONS) {
-            throw new Error(`Engram server returned too many conflict relations (maximum ${MAX_CONFLICT_RELATIONS})`);
+            throw new Error(
+                `Engram server returned too many conflict relations (maximum ${MAX_CONFLICT_RELATIONS})`,
+            );
         }
 
-        if (page.length === 0) break;
+        if (initialTotal === undefined) {
+            initialTotal = total;
+        } else if (total !== initialTotal) {
+            throw new Error("Conflict relations total changed during pagination; please retry");
+        }
+
+        if (page.length === 0) {
+            if (relations.length < total) {
+                throw new Error(
+                    `Incomplete conflict pagination: received ${relations.length} relations but expected ${total}`,
+                );
+            }
+            break;
+        }
 
         relations.push(...page);
         offset += page.length;

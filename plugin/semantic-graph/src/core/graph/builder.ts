@@ -1,23 +1,19 @@
-import type {
-    EngramObservation,
-    EngramRelation,
-    EngramSession
-} from "../../services/engram/types";
-import type {
-    GraphEdge,
-    GraphEdgeRelation,
-    GraphNode,
-    TypeMetadata
-} from "../../types";
+import type { EngramObservation, EngramRelation, EngramSession } from "../../services/engram/types";
+import type { GraphEdge, GraphEdgeRelation, GraphNode, TypeMetadata } from "../../types";
 import {
     calculateObservationLifecycle,
     isConventionLike,
-    normalizeObservationType
+    normalizeObservationType,
+    normalizeTopicKey,
 } from "./rules";
 
 const GLOBAL_ROOT_ID = "global:context";
 
-export function ensureProjectNode(nodesMap: Map<string, GraphNode>, edges: GraphEdge[], project: string): string {
+export function ensureProjectNode(
+    nodesMap: Map<string, GraphNode>,
+    edges: GraphEdge[],
+    project: string,
+): string {
     const id = `project:${project}`;
     if (!nodesMap.has(id)) {
         nodesMap.set(id, {
@@ -57,10 +53,15 @@ export function buildGlobalObservationNodes(
             lifecycle: calculateObservationLifecycle(obs.review_after, referenceDate),
             type: normalizeObservationType(obs.type),
             scope: obs.scope,
+            topic_key: normalizeTopicKey(obs.topic_key),
             content: obs.content,
             metadata: {
-                project: obs.project || globalSessionsById.get(obs.session_id)?.project || fallbackProject,
+                project:
+                    obs.project ||
+                    globalSessionsById.get(obs.session_id)?.project ||
+                    fallbackProject,
                 sync_id: obs.sync_id,
+                session_id: obs.session_id,
                 created_at: obs.created_at,
             },
         });
@@ -78,7 +79,7 @@ export function buildGlobalObservationNodes(
 
 export function buildRelationEdges(
     relations: EngramRelation[],
-    syncMap: Map<string, string>
+    syncMap: Map<string, string>,
 ): GraphEdge[] {
     const edges: GraphEdge[] = [];
 

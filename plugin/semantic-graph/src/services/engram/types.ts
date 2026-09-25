@@ -1,10 +1,10 @@
-import { ENGRAM_SCOPES } from "./constants";
+import type { ENGRAM_SCOPES } from "./constants";
 
 /**
  * Raw Engram entity representations coming from Go HTTP endpoints.
  */
 
-export type ScopeType = typeof ENGRAM_SCOPES[number];
+export type ScopeType = (typeof ENGRAM_SCOPES)[number];
 
 export type EngramRelationType =
     | "supersedes"

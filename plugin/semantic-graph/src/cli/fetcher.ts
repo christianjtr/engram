@@ -1,5 +1,5 @@
+import { DEFAULT_GLOBAL_LIMIT, MAX_GLOBAL_LIMIT } from "../config";
 import { EngramServices } from "../services/engram";
-import { DEFAULT_GLOBAL_LIMIT } from "../config";
 import type { EngramObservation } from "../services/engram/types";
 import type { GraphBuildOptions } from "../types/graph";
 
@@ -21,18 +21,20 @@ export async function fetchEngramData(options?: GraphBuildOptions) {
         if (isAll) {
             globalsPromise = Promise.resolve([]);
         } else {
-            const limit = options?.globalLimit ?? DEFAULT_GLOBAL_LIMIT;
+            const limit = options?.allGlobals
+                ? MAX_GLOBAL_LIMIT
+                : (options?.globalLimit ?? DEFAULT_GLOBAL_LIMIT);
             globalsPromise = EngramServices.fetchGlobalObservations(limit);
         }
 
         const [exportData, conflicts, externalGlobals] = await Promise.all([
             exportPromise,
             conflictsPromise,
-            globalsPromise
+            globalsPromise,
         ]);
 
         const globalObservations = isAll
-            ? exportData.observations.filter(obs => obs.scope === "global")
+            ? exportData.observations.filter((obs) => obs.scope === "global")
             : externalGlobals;
 
         return {

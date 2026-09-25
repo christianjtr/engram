@@ -1,8 +1,8 @@
-import { fetchEngramData } from "./fetcher";
-import { buildSemanticGraph } from "../core/graph";
 import { ENGRAM_DIR, getSemanticGraphPath } from "../config";
-import { writeAtomicFile, ensureDir } from "../utils/fileUtils";
+import { buildSemanticGraph } from "../core/graph";
 import type { GraphBuildOptions } from "../types/graph";
+import { ensureDir, writeAtomicFile } from "../utils/fileUtils";
+import { fetchEngramData } from "./fetcher";
 
 export async function runGenerateGraph(options?: GraphBuildOptions) {
     const rawData = await fetchEngramData(options);

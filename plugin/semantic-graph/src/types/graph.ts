@@ -1,11 +1,6 @@
 import type { ObservationLifecycle, SessionStatus, TypeMetadata } from "./observation";
 
-export type GraphNodeCategory =
-    | "GLOBAL_CONTEXT"
-    | "PROJECT"
-    | "TOPIC"
-    | "OBSERVATION"
-    | "SESSION";
+export type GraphNodeCategory = "GLOBAL_CONTEXT" | "PROJECT" | "TOPIC" | "OBSERVATION" | "SESSION";
 
 export interface GlobalContextNode {
     id: string;
@@ -53,12 +48,7 @@ export interface SessionNode {
     metadata: { project: string; started_at: string };
 }
 
-export type GraphNode =
-    | GlobalContextNode
-    | ProjectNode
-    | TopicNode
-    | ObservationNode
-    | SessionNode;
+export type GraphNode = GlobalContextNode | ProjectNode | TopicNode | ObservationNode | SessionNode;
 
 export type GraphEdgeRelation =
     | "INHERITS"
@@ -108,6 +98,7 @@ export interface GraphBuildOptions {
     all?: boolean;
     referenceDate?: Date;
     globalLimit?: number;
+    allGlobals?: boolean;
     includeStale?: boolean;
     includeSessions?: boolean;
     topicFilter?: string;

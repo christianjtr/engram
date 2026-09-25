@@ -7,7 +7,12 @@ dayjs.extend(utc);
 dayjs.extend(customParseFormat);
 
 const CONVENTION_TYPES = new Set(["convention", "decision", "architecture", "pattern"]);
-const REVIEW_FORMATS = ["YYYY-MM-DD HH:mm:ss", "YYYY-MM-DDTHH:mm:ssZ", "YYYY-MM-DDTHH:mm:ss.SSSZ", "YYYY-MM-DD"];
+const REVIEW_FORMATS = [
+    "YYYY-MM-DD HH:mm:ss",
+    "YYYY-MM-DDTHH:mm:ssZ",
+    "YYYY-MM-DDTHH:mm:ss.SSSZ",
+    "YYYY-MM-DD",
+];
 
 export function normalizeObservationType(rawType?: string | null): string {
     return rawType?.trim().toLowerCase() || "other";
@@ -23,16 +28,23 @@ export function isConventionLike(type?: string | null): boolean {
 
 export function calculateObservationLifecycle(
     reviewAfter?: string | null,
-    referenceDate: Date = new Date()
+    referenceDate: Date = new Date(),
 ): ObservationLifecycle {
     if (!reviewAfter?.trim()) return "active";
 
+    const trimmed = reviewAfter.trim();
     for (const fmt of REVIEW_FORMATS) {
-        const d = dayjs.utc(reviewAfter, fmt, true);
+        const d = dayjs.utc(trimmed, fmt, true);
         if (d.isValid()) {
             return d.isAfter(referenceDate) ? "active" : "stale";
         }
     }
+
+    const fallback = dayjs.utc(trimmed);
+    if (fallback.isValid()) {
+        return fallback.isAfter(referenceDate) ? "active" : "stale";
+    }
+
     return "active";
 }
 
