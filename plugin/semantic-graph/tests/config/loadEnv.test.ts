@@ -3,30 +3,11 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, test } from "node:test";
-import { applyEnvValues, loadEnvFiles, parseEnvFile } from "../../src/config/loadEnv";
+import { applyEnvValues, loadEnvFiles } from "../../src/config/loadEnv";
 import { clearEngramEnv, restoreFetchEnv } from "../helpers/mockFetch";
 
 afterEach(() => {
     restoreFetchEnv();
-});
-
-test("parseEnvFile reads keys, quotes, export, and skips comments", () => {
-    const parsed = parseEnvFile(`
-# comment
-ENGRAM_URL=http://127.0.0.1:9000
-export ENGRAM_PORT=9000
-ENGRAM_HTTP_TOKEN="secret token"
-ENGRAM_PROJECT='engram'
-OTHER=ignored-by-apply
-INVALID LINE
-=nouser
-`);
-
-    assert.equal(parsed.ENGRAM_URL, "http://127.0.0.1:9000");
-    assert.equal(parsed.ENGRAM_PORT, "9000");
-    assert.equal(parsed.ENGRAM_HTTP_TOKEN, "secret token");
-    assert.equal(parsed.ENGRAM_PROJECT, "engram");
-    assert.equal(parsed.OTHER, "ignored-by-apply");
 });
 
 test("applyEnvValues only sets allowlisted keys and skips empty values", () => {
@@ -71,6 +52,21 @@ test("loadEnvFiles prefers cwd .env over user .env, then process env", async () 
     assert.equal(process.env.ENGRAM_PORT, "1111");
     assert.equal(process.env.ENGRAM_PROJECT, "from-process");
     assert.equal(process.env.OTHER, undefined);
+});
+
+test("loadEnvFiles parses quotes and export via node:util parseEnv", async () => {
+    clearEngramEnv();
+    const cwd = await mkdtemp(path.join(tmpdir(), "semantic-graph-env-parse-"));
+    await writeFile(
+        path.join(cwd, ".env"),
+        `export ENGRAM_URL="http://127.0.0.1:9000"
+ENGRAM_HTTP_TOKEN='secret token'
+`,
+    );
+
+    await loadEnvFiles({ cwd, userDir: path.join(cwd, "missing-user") });
+    assert.equal(process.env.ENGRAM_URL, "http://127.0.0.1:9000");
+    assert.equal(process.env.ENGRAM_HTTP_TOKEN, "secret token");
 });
 
 test("loadEnvFiles ignores missing env files", async () => {

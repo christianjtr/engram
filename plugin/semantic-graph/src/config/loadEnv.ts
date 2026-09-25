@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { parseEnv } from "node:util";
 import { ENGRAM_DIR } from "./index";
 
 export const ENV_ALLOWLIST = [
@@ -11,39 +12,7 @@ export const ENV_ALLOWLIST = [
 
 export type EngramEnvKey = (typeof ENV_ALLOWLIST)[number];
 
-const ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
-export function parseEnvFile(content: string): Record<string, string> {
-    const result: Record<string, string> = {};
-
-    for (const rawLine of content.split(/\r?\n/)) {
-        const line = rawLine.trim();
-        if (!line || line.startsWith("#")) continue;
-
-        const withoutExport = line.startsWith("export ")
-            ? line.slice("export ".length).trim()
-            : line;
-        const eq = withoutExport.indexOf("=");
-        if (eq <= 0) continue;
-
-        const key = withoutExport.slice(0, eq).trim();
-        if (!ENV_KEY_PATTERN.test(key)) continue;
-
-        let value = withoutExport.slice(eq + 1).trim();
-        if (
-            (value.startsWith('"') && value.endsWith('"') && value.length >= 2) ||
-            (value.startsWith("'") && value.endsWith("'") && value.length >= 2)
-        ) {
-            value = value.slice(1, -1);
-        }
-
-        result[key] = value;
-    }
-
-    return result;
-}
-
-export function applyEnvValues(values: Record<string, string>): void {
+export function applyEnvValues(values: NodeJS.Dict<string>): void {
     for (const key of ENV_ALLOWLIST) {
         if (process.env[key]?.trim()) continue;
         const value = values[key];
@@ -52,9 +21,9 @@ export function applyEnvValues(values: Record<string, string>): void {
     }
 }
 
-async function readEnvIfExists(filePath: string): Promise<Record<string, string>> {
+async function readEnvIfExists(filePath: string): Promise<NodeJS.Dict<string>> {
     try {
-        return parseEnvFile(await readFile(filePath, "utf-8"));
+        return parseEnv(await readFile(filePath, "utf-8"));
     } catch (error) {
         if (error instanceof Error && "code" in error && error.code === "ENOENT") {
             return {};
